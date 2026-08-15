@@ -101,7 +101,7 @@ const daysFromNow = (n: number) => {
   return d.toISOString().slice(0, 10)
 }
 
-const AVATARS = (seed: string) =>
+export const AVATARS = (seed: string) =>
   `https://api.dicebear.com/9.x/avataaars/svg?seed=${seed}&backgroundColor=1e3a1e`
 
 export const initialMembers: Member[] = [
@@ -247,7 +247,7 @@ const emptyProfile = (id: string): Profile => ({
   id,
   name: '',
   username: '',
-  avatar: '',
+  avatar: AVATARS(id),
   bio: '',
   email: '',
   phone: '',
@@ -602,12 +602,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ? p.supporters.filter((s) => s !== currentUserId)
       : [...p.supporters, currentUserId]
 
-    if (isLive && supabase) {
-      if (withdrawing)
-        supabase.from('proposal_supporters').delete().eq('proposal_id', id).eq('user_id', currentUserId).then(logError('withdraw'))
-      else supabase.from('proposal_supporters').insert({ proposal_id: id, user_id: currentUserId }).then(logError('support'))
-    }
-
     if (supporters.length >= approvalThreshold) {
       const meetId = crypto.randomUUID()
       const memberIds = members.map((m) => m.id)
@@ -630,18 +624,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       setProposals((ps) => ps.map((x) => (x.id === id ? { ...x, supporters, approvedMeetId: meetId } : x)))
       if (isLive && supabase) {
         const run = async () => {
-          const { error } = await supabase!
-            .from('meets')
-            .insert({ id: meetId, name: p.name, location: p.locationName, address: p.address, city: p.city, state: p.state, zip: p.zip, date: p.date, time: p.time, photo_url: FOOD_IMG(meetId), created_by: currentUserId })
+          const { error: supportError } = await supabase!
+            .from('proposal_supporters')
+            .insert({ proposal_id: id, user_id: currentUserId })
+          if (supportError) return console.error('[supabase] support:', supportError.message)
+          const { error } = await supabase!.rpc('approve_proposal', {
+            p_proposal_id: id,
+            p_meet_id: meetId,
+            p_photo_url: FOOD_IMG(meetId),
+          })
           if (error) return console.error('[supabase] approve meet:', error.message)
-          await supabase!.from('rsvps').upsert({ meet_id: meetId, user_id: currentUserId, status: 'yes' })
-          await supabase!.from('proposals').update({ approved_meet_id: meetId }).eq('id', id)
           notifyOthers(`${p.name} is official — RSVP now!`, `/meets/${meetId}`)
         }
         run()
       }
     } else {
       setProposals((ps) => ps.map((x) => (x.id === id ? { ...x, supporters } : x)))
+      if (isLive && supabase) {
+        if (withdrawing)
+          supabase.from('proposal_supporters').delete().eq('proposal_id', id).eq('user_id', currentUserId).then(logError('withdraw'))
+        else supabase.from('proposal_supporters').insert({ proposal_id: id, user_id: currentUserId }).then(logError('support'))
+      }
     }
   }
 

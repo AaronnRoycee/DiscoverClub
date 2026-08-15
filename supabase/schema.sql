@@ -134,6 +134,44 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- ============ PROPOSAL APPROVAL ============
+-- Runs server-side so the threshold is enforced atomically and supporters'
+-- RSVP rows can be created (RLS prevents users from writing others' rows).
+
+create or replace function public.approve_proposal(p_proposal_id uuid, p_meet_id uuid, p_photo_url text)
+returns boolean
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+  prop public.proposals%rowtype;
+  supporter_count int;
+  member_count int;
+  threshold int;
+begin
+  select * into prop from public.proposals where id = p_proposal_id for update;
+  if not found or prop.approved_meet_id is not null then
+    return false;
+  end if;
+  select count(*) into supporter_count from public.proposal_supporters where proposal_id = p_proposal_id;
+  select count(*) into member_count from public.profiles;
+  threshold := greatest(2, member_count / 2 + 1);
+  if supporter_count < threshold then
+    return false;
+  end if;
+  insert into public.meets (id, name, location, address, city, state, zip, date, time, photo_url, created_by)
+  values (p_meet_id, prop.name, prop.location_name, prop.address, prop.city, prop.state, prop.zip, prop.date, prop.time, p_photo_url, auth.uid());
+  insert into public.rsvps (meet_id, user_id, status)
+  select p_meet_id, user_id, 'yes' from public.proposal_supporters where proposal_id = p_proposal_id
+  on conflict (meet_id, user_id) do update set status = 'yes';
+  update public.proposals set approved_meet_id = p_meet_id where id = p_proposal_id;
+  return true;
+end;
+$$;
+
+revoke execute on function public.approve_proposal(uuid, uuid, text) from public, anon;
+grant execute on function public.approve_proposal(uuid, uuid, text) to authenticated;
+
 -- ============ ROW LEVEL SECURITY ============
 -- Club data is shared among signed-in members; each user can only write their own rows.
 

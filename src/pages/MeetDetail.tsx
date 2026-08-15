@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useStore, daysUntil, formatDate, isPast } from '../store'
+import { useStore, daysUntil, formatDate, isPast, AVATARS } from '../store'
 import Stars from '../components/Stars'
 
 export default function MeetDetail() {
@@ -23,7 +23,7 @@ export default function MeetDetail() {
   const memberById = (mid: string) =>
     mid === currentUserId
       ? { name: profile.name, avatar: profile.avatar }
-      : (members.find((m) => m.id === mid) ?? { name: 'Member', avatar: '' })
+      : (members.find((m) => m.id === mid) ?? { name: 'Member', avatar: AVATARS(mid) })
 
   const past = isPast(meet.date)
   const days = daysUntil(meet.date)
