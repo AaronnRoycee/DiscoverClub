@@ -68,10 +68,65 @@ function NotificationsDropdown() {
 const navItems = [
   { to: '/', label: 'Home', icon: 'M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75' },
   { to: '/members', label: 'Members', icon: 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z' },
-  { to: '/submit', label: 'Submit', icon: '' },
+  { to: '', label: 'Actions', icon: '' },
   { to: '/meets', label: 'Meets', icon: 'M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5' },
   { to: '/history', label: 'History', icon: 'M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z' },
 ]
+
+const quickActions = [
+  { to: '/submit', icon: '📍', title: 'Submit a Location', desc: 'Suggest a spot for the ballot' },
+  { to: '/propose', icon: '💡', title: 'Propose a Meet', desc: 'Suggest the next meet date' },
+  { to: '/vote', icon: '🗳️', title: 'Vote for Locations', desc: 'Pick your favorite spot' },
+]
+
+function QuickActionsButton() {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
+
+  return (
+    <div className="relative" ref={ref}>
+      {open && (
+        <div className="absolute bottom-20 left-1/2 z-30 w-72 -translate-x-1/2 overflow-hidden rounded-2xl border border-club-border bg-club-card shadow-xl">
+          {quickActions.map((a) => (
+            <button
+              key={a.to}
+              className="flex w-full cursor-pointer items-center gap-3 border-b border-club-border/50 px-4 py-3 text-left last:border-b-0 hover:bg-club-card2"
+              onClick={() => {
+                setOpen(false)
+                navigate(a.to)
+              }}
+            >
+              <span className="text-2xl">{a.icon}</span>
+              <span>
+                <span className="block font-semibold text-gray-100">{a.title}</span>
+                <span className="block text-xs text-gray-400">{a.desc}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      <button onClick={() => setOpen((o) => !o)} aria-label="Quick actions" className="flex -mt-6 cursor-pointer flex-col items-center gap-1">
+        <span
+          className={`flex h-14 w-14 items-center justify-center rounded-full bg-club-green text-3xl font-light text-club-bg shadow-lg shadow-club-green/30 transition-transform ${
+            open ? 'rotate-45' : ''
+          }`}
+        >
+          +
+        </span>
+        <span className="text-xs text-gray-400">Actions</span>
+      </button>
+    </div>
+  )
+}
 
 export default function Layout() {
   const { profile } = useStore()
@@ -98,13 +153,8 @@ export default function Layout() {
       <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-club-border bg-club-card/95 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-end justify-around px-2 pt-2 pb-2">
           {navItems.map((item) =>
-            item.label === 'Submit' ? (
-              <NavLink key={item.to} to={item.to} className="flex -mt-6 flex-col items-center gap-1">
-                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-club-green text-3xl font-light text-club-bg shadow-lg shadow-club-green/30">
-                  +
-                </span>
-                <span className="text-xs text-gray-400">Submit</span>
-              </NavLink>
+            item.label === 'Actions' ? (
+              <QuickActionsButton key="actions" />
             ) : (
               <NavLink
                 key={item.to}
