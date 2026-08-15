@@ -25,7 +25,7 @@ export default function History() {
                 <p className="text-sm text-gray-400">Visited {formatDate(m.date)}</p>
                 {avg !== null && (
                   <div className="mt-1 flex items-center gap-2">
-                    <Stars rating={Math.round(avg)} />
+                    <Stars rating={avg} />
                     <span className="text-sm text-gray-300">{avg.toFixed(1)} ({m.reviews.length} reviews)</span>
                   </div>
                 )}

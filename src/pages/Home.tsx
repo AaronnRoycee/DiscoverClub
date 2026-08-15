@@ -15,6 +15,7 @@ export default function Home() {
   if (!hasSubmittedLocation)
     actions.push({ id: 'a1', icon: '❗', title: 'Submit a Location', desc: "You haven't submitted a suggestion yet.", cta: 'Submit Now', link: '/submit' })
   actions.push({ id: 'a2', icon: '🗳️', title: 'Vote for Locations', desc: 'Voting is open! Pick your favorite.', cta: 'Vote Now', link: '/vote' })
+  actions.push({ id: 'a4', icon: '💡', title: 'Propose a Meet', desc: 'Suggest the next meet date to the group.', cta: 'Propose', link: '/propose' })
   if (nextMeet && nextMeet.rsvps[CURRENT_USER_ID] === 'pending')
     actions.push({ id: 'a3', icon: '📅', title: `RSVP to ${nextMeet.name}`, desc: 'Let the group know if you can make it.', cta: 'RSVP', link: `/meets/${nextMeet.id}` })
 
@@ -61,7 +62,7 @@ export default function Home() {
               <p className="text-sm text-gray-400">Visited {formatDate(lastMeet.date)}</p>
               {lastMeet.reviews.length > 0 && (
                 <div className="mt-1 flex items-center gap-2">
-                  <Stars rating={Math.round(avgRating(lastMeet.reviews.map((r) => r.rating)))} />
+                  <Stars rating={avgRating(lastMeet.reviews.map((r) => r.rating))} />
                   <span className="text-sm text-gray-300">
                     {avgRating(lastMeet.reviews.map((r) => r.rating)).toFixed(1)} ({lastMeet.reviews.length} reviews)
                   </span>

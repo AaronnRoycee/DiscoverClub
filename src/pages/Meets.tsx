@@ -108,6 +108,10 @@ export default function Meets() {
           <MeetRow key={m.id} id={m.id} name={m.name} location={m.location} date={m.date} time={m.time} />
         ))}
       </section>
+
+      <Link to="/propose" className="block rounded-2xl border border-club-border bg-club-card p-4 text-center font-semibold text-club-green hover:bg-club-card2">
+        💡 Propose the next meet date
+      </Link>
     </div>
   )
 }

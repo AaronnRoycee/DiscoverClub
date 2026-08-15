@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useStore } from '../store'
 
 export default function Profile() {
@@ -6,9 +6,25 @@ export default function Profile() {
   const [form, setForm] = useState(profile)
   const [saved, setSaved] = useState(false)
 
+  const fileRef = useRef<HTMLInputElement>(null)
+
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm({ ...form, [key]: e.target.value })
     setSaved(false)
+  }
+
+  const onPickPhoto = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      const avatar = reader.result as string
+      setForm((f) => ({ ...f, avatar }))
+      setProfile({ ...form, avatar })
+      setSaved(false)
+    }
+    reader.readAsDataURL(file)
+    e.target.value = ''
   }
 
   return (
@@ -22,8 +38,16 @@ export default function Profile() {
         <div className="flex items-center gap-4">
           <img src={form.avatar} alt={form.name} className="h-20 w-20 rounded-full border border-club-border bg-club-card2 object-cover" />
           <div className="flex-1">
-            <label className="text-xs font-semibold text-gray-400 uppercase">Profile Picture URL</label>
-            <input value={form.avatar} onChange={set('avatar')} className={inputCls} />
+            <label className="text-xs font-semibold text-gray-400 uppercase">Profile Picture</label>
+            <input ref={fileRef} type="file" accept="image/*" onChange={onPickPhoto} className="hidden" />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              className="mt-1 w-full cursor-pointer rounded-xl border border-club-border py-2 text-sm font-semibold text-club-green hover:bg-club-card2"
+            >
+              📷 Choose Photo
+            </button>
+            <p className="mt-1 text-xs text-gray-500">Opens your photo library to pick a picture</p>
           </div>
         </div>
       </section>

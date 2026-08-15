@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useStore, daysUntil, formatDate, isPast, CURRENT_USER_ID } from '../store'
 import Stars from '../components/Stars'
@@ -10,6 +10,7 @@ export default function MeetDetail() {
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
   const [chatText, setChatText] = useState('')
+  const photoRef = useRef<HTMLInputElement>(null)
 
   if (!meet) {
     return (
@@ -93,11 +94,25 @@ export default function MeetDetail() {
         ) : (
           <p className="mt-2 text-sm text-gray-400">No photos yet.</p>
         )}
+        <input
+          ref={photoRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            if (!file) return
+            const reader = new FileReader()
+            reader.onload = () => addPhoto(meet.id, reader.result as string)
+            reader.readAsDataURL(file)
+            e.target.value = ''
+          }}
+        />
         <button
-          onClick={() => addPhoto(meet.id, `https://picsum.photos/seed/${meet.id}-${Date.now()}/640/400`)}
+          onClick={() => photoRef.current?.click()}
           className="mt-3 w-full cursor-pointer rounded-xl border border-club-border py-2 text-sm font-semibold text-club-green hover:bg-club-card2"
         >
-          + Add Photo
+          📷 Add Photo from your device
         </button>
       </section>
 
@@ -135,7 +150,11 @@ export default function MeetDetail() {
             }}
           >
             <p className="text-sm font-semibold text-gray-300">Leave a review</p>
-            <Stars rating={rating} size="lg" onRate={setRating} />
+            <div className="flex items-center gap-2">
+              <Stars rating={rating} size="lg" onRate={setRating} />
+              {rating > 0 && <span className="text-sm font-semibold text-yellow-400">{rating}</span>}
+            </div>
+            <p className="text-xs text-gray-500">Tap the left half of a star for a half rating (e.g. 4.5)</p>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}

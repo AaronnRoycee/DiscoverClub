@@ -54,8 +54,31 @@ export interface Notification {
 export interface LocationOption {
   id: string
   name: string
+  address: string
+  city: string
+  state: string
+  zip: string
   submittedBy: string
   votes: string[]
+}
+
+export interface MeetProposal {
+  id: string
+  name: string
+  date: string
+  time: string
+  locationName: string
+  address: string
+  city: string
+  state: string
+  zip: string
+  proposedBy: string
+  supporters: string[]
+}
+
+export function mapUrlFor(name: string, address: string, city: string, state: string, zip: string): string {
+  const query = [name, address, city, state, zip].filter(Boolean).join(', ')
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 }
 
 export interface Profile {
@@ -124,7 +147,7 @@ export const initialMeets: Meet[] = [
     rsvps: { u1: 'yes', u2: 'yes', u3: 'yes', u4: 'no', u5: 'yes', u6: 'yes', u7: 'no', u8: 'yes' },
     reviews: [
       { id: 'r1', memberId: 'u2', rating: 5, comment: 'Great brisket and vibes!', date: 'Apr 26, 2025' },
-      { id: 'r2', memberId: 'u3', rating: 4, comment: 'Loved the birria egg rolls. Long line though.', date: 'Apr 26, 2025' },
+      { id: 'r2', memberId: 'u3', rating: 4.5, comment: 'Loved the birria egg rolls. Long line though.', date: 'Apr 26, 2025' },
       { id: 'r3', memberId: 'u5', rating: 5, comment: 'Top 3 BBQ in DFW easily.', date: 'Apr 27, 2025' },
       { id: 'r4', memberId: 'u6', rating: 4, comment: 'Solid. Would come back for the turkey.', date: 'Apr 27, 2025' },
     ],
@@ -194,9 +217,25 @@ export const initialNotifications: Notification[] = [
 ]
 
 export const initialLocationOptions: LocationOption[] = [
-  { id: 'l1', name: 'Pecan Lodge', submittedBy: 'u2', votes: ['u2', 'u3'] },
-  { id: 'l2', name: 'Velvet Taco', submittedBy: 'u5', votes: ['u5'] },
-  { id: 'l3', name: 'Meddlesome Moth', submittedBy: 'u7', votes: ['u7', 'u4', 'u6'] },
+  { id: 'l1', name: 'Pecan Lodge', address: '2702 Main St', city: 'Dallas', state: 'TX', zip: '75226', submittedBy: 'u2', votes: ['u2', 'u3'] },
+  { id: 'l2', name: 'Velvet Taco', address: '3012 N Henderson Ave', city: 'Dallas', state: 'TX', zip: '75206', submittedBy: 'u5', votes: ['u5'] },
+  { id: 'l3', name: 'Meddlesome Moth', address: '1621 Oak Lawn Ave', city: 'Dallas', state: 'TX', zip: '75207', submittedBy: 'u7', votes: ['u7', 'u4', 'u6'] },
+]
+
+export const initialProposals: MeetProposal[] = [
+  {
+    id: 'p1',
+    name: 'Sushi Sunday',
+    date: daysFromNow(24),
+    time: '6:30 PM',
+    locationName: 'Sushi Marquee',
+    address: '5880 State Hwy 121',
+    city: 'Frisco',
+    state: 'TX',
+    zip: '75034',
+    proposedBy: 'u3',
+    supporters: ['u3', 'u5'],
+  },
 ]
 
 export const CURRENT_USER_ID = 'u1'
@@ -209,13 +248,16 @@ interface Store {
   notifications: Notification[]
   markNotificationsRead: () => void
   locationOptions: LocationOption[]
-  submitLocation: (name: string) => void
+  submitLocation: (loc: Omit<LocationOption, 'id' | 'submittedBy' | 'votes'>) => void
   hasSubmittedLocation: boolean
   voteForLocation: (id: string) => void
   setRsvp: (meetId: string, rsvp: Rsvp) => void
   addReview: (meetId: string, rating: number, comment: string) => void
   addChatMessage: (meetId: string, text: string) => void
   addPhoto: (meetId: string, url: string) => void
+  proposals: MeetProposal[]
+  addProposal: (p: Omit<MeetProposal, 'id' | 'proposedBy' | 'supporters'>) => void
+  supportProposal: (id: string) => void
 }
 
 const StoreContext = createContext<Store | null>(null)
@@ -235,17 +277,38 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
   const [locationOptions, setLocationOptions] = useState<LocationOption[]>(initialLocationOptions)
   const [hasSubmittedLocation, setHasSubmittedLocation] = useState(false)
+  const [proposals, setProposals] = useState<MeetProposal[]>(initialProposals)
 
   const markNotificationsRead = () =>
     setNotifications((ns) => ns.map((n) => ({ ...n, read: true })))
 
-  const submitLocation = (name: string) => {
+  const submitLocation = (loc: Omit<LocationOption, 'id' | 'submittedBy' | 'votes'>) => {
     setLocationOptions((opts) => [
       ...opts,
-      { id: `l${Date.now()}`, name, submittedBy: CURRENT_USER_ID, votes: [CURRENT_USER_ID] },
+      { ...loc, id: `l${Date.now()}`, submittedBy: CURRENT_USER_ID, votes: [CURRENT_USER_ID] },
     ])
     setHasSubmittedLocation(true)
   }
+
+  const addProposal = (p: Omit<MeetProposal, 'id' | 'proposedBy' | 'supporters'>) =>
+    setProposals((ps) => [
+      ...ps,
+      { ...p, id: `p${Date.now()}`, proposedBy: CURRENT_USER_ID, supporters: [CURRENT_USER_ID] },
+    ])
+
+  const supportProposal = (id: string) =>
+    setProposals((ps) =>
+      ps.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              supporters: p.supporters.includes(CURRENT_USER_ID)
+                ? p.supporters.filter((s) => s !== CURRENT_USER_ID)
+                : [...p.supporters, CURRENT_USER_ID],
+            }
+          : p,
+      ),
+    )
 
   const voteForLocation = (id: string) =>
     setLocationOptions((opts) =>
@@ -322,6 +385,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         addReview,
         addChatMessage,
         addPhoto,
+        proposals,
+        addProposal,
+        supportProposal,
       }}
     >
       {children}

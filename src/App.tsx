@@ -9,6 +9,7 @@ import History from './pages/History'
 import Profile from './pages/Profile'
 import Submit from './pages/Submit'
 import Vote from './pages/Vote'
+import ProposeMeet from './pages/ProposeMeet'
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
             <Route path="/profile" element={<Profile />} />
             <Route path="/submit" element={<Submit />} />
             <Route path="/vote" element={<Vote />} />
+            <Route path="/propose" element={<ProposeMeet />} />
           </Route>
         </Routes>
       </BrowserRouter>

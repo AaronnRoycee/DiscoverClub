@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { useStore, CURRENT_USER_ID } from '../store'
+import { useStore, mapUrlFor, CURRENT_USER_ID } from '../store'
 
 export default function Vote() {
   const { locationOptions, voteForLocation, members } = useStore()
@@ -17,23 +17,39 @@ export default function Vote() {
           const isMine = o.votes.includes(CURRENT_USER_ID)
           const submitter = members.find((m) => m.id === o.submittedBy)
           return (
-            <button
+            <div
               key={o.id}
+              role="button"
+              tabIndex={0}
               onClick={() => voteForLocation(o.id)}
-              className={`flex w-full cursor-pointer items-center justify-between rounded-2xl border p-4 text-left ${
+              onKeyDown={(e) => e.key === 'Enter' && voteForLocation(o.id)}
+              className={`w-full cursor-pointer rounded-2xl border p-4 text-left ${
                 isMine ? 'border-club-green bg-club-green-dark' : 'border-club-border bg-club-card hover:bg-club-card2'
               }`}
             >
-              <div>
-                <p className="font-semibold">{o.name}</p>
-                <p className="text-sm text-gray-400">Suggested by {submitter?.name ?? 'a member'}</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-semibold">{o.name}</p>
+                  <p className="text-sm text-gray-300">📍 {o.address}</p>
+                  <p className="text-sm text-gray-400">{o.city}, {o.state} {o.zip}</p>
+                  <p className="mt-1 text-xs text-gray-500">Suggested by {submitter?.name ?? 'a member'}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-lg font-bold text-club-green">{o.votes.length}</p>
+                  <p className="text-xs text-gray-400">vote{o.votes.length === 1 ? '' : 's'}</p>
+                  {isMine && <p className="text-xs font-semibold text-club-green">✔ Your vote</p>}
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-lg font-bold text-club-green">{o.votes.length}</p>
-                <p className="text-xs text-gray-400">vote{o.votes.length === 1 ? '' : 's'}</p>
-                {isMine && <p className="text-xs font-semibold text-club-green">✔ Your vote</p>}
-              </div>
-            </button>
+              <a
+                href={mapUrlFor(o.name, o.address, o.city, o.state, o.zip)}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="mt-3 block rounded-xl border border-club-border py-1.5 text-center text-sm font-semibold text-club-green hover:bg-club-card2"
+              >
+                🗺️ View on Map
+              </a>
+            </div>
           )
         })}
       </div>
