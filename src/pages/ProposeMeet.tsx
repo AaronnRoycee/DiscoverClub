@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useStore, mapUrlFor, formatDate, CURRENT_USER_ID, APPROVAL_THRESHOLD } from '../store'
+import { useStore, mapUrlFor, formatDate } from '../store'
 import TimePicker from '../components/TimePicker'
 
 const emptyForm = { name: '', date: '', time: '7:00 PM', locationName: '', address: '', city: '', state: 'TX', zip: '' }
 
 export default function ProposeMeet() {
-  const { proposals, addProposal, supportProposal, members, profile } = useStore()
+  const { proposals, addProposal, supportProposal, members, profile, currentUserId, approvalThreshold } = useStore()
   const [form, setForm] = useState(emptyForm)
   const [submitted, setSubmitted] = useState(false)
 
@@ -16,7 +16,7 @@ export default function ProposeMeet() {
   const valid = form.name.trim() && form.date && form.time.trim() && form.locationName.trim()
 
   const memberName = (id: string) =>
-    id === CURRENT_USER_ID ? profile.name : (members.find((m) => m.id === id)?.name ?? 'a member')
+    id === currentUserId ? profile.name : (members.find((m) => m.id === id)?.name ?? 'a member')
 
   const sorted = [...proposals].sort((a, b) => b.supporters.length - a.supporters.length)
 
@@ -87,10 +87,10 @@ export default function ProposeMeet() {
 
       <section className="space-y-3">
         <h2 className="text-xs font-bold tracking-widest text-club-green uppercase">📋 Proposed Meets</h2>
-        <p className="text-xs text-gray-500">A proposal becomes an official meet on the calendar once {APPROVAL_THRESHOLD} members support it.</p>
+        <p className="text-xs text-gray-500">A proposal becomes an official meet on the calendar once {approvalThreshold} members support it.</p>
         {sorted.length === 0 && <p className="text-sm text-gray-400">No proposals yet. Be the first!</p>}
         {sorted.map((p) => {
-          const iSupport = p.supporters.includes(CURRENT_USER_ID)
+          const iSupport = p.supporters.includes(currentUserId)
           const approved = Boolean(p.approvedMeetId)
           return (
             <div key={p.id} className={`rounded-2xl border p-4 ${approved || iSupport ? 'border-club-green bg-club-green-dark' : 'border-club-border bg-club-card'}`}>
@@ -105,16 +105,16 @@ export default function ProposeMeet() {
                   <p className="mt-1 text-xs text-gray-500">Proposed by {memberName(p.proposedBy)}</p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="text-lg font-bold text-club-green">{p.supporters.length}<span className="text-sm text-gray-400">/{APPROVAL_THRESHOLD}</span></p>
+                  <p className="text-lg font-bold text-club-green">{p.supporters.length}<span className="text-sm text-gray-400">/{approvalThreshold}</span></p>
                   <p className="text-xs text-gray-400">in favor</p>
                 </div>
               </div>
               {!approved && (
                 <div className="mt-3">
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-club-bg">
-                    <div className="h-full rounded-full bg-club-green" style={{ width: `${Math.min(100, (p.supporters.length / APPROVAL_THRESHOLD) * 100)}%` }} />
+                    <div className="h-full rounded-full bg-club-green" style={{ width: `${Math.min(100, (p.supporters.length / approvalThreshold) * 100)}%` }} />
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">{APPROVAL_THRESHOLD - p.supporters.length} more supporter{APPROVAL_THRESHOLD - p.supporters.length === 1 ? '' : 's'} needed to make it official</p>
+                  <p className="mt-1 text-xs text-gray-500">{approvalThreshold - p.supporters.length} more supporter{approvalThreshold - p.supporters.length === 1 ? '' : 's'} needed to make it official</p>
                 </div>
               )}
               {approved && (

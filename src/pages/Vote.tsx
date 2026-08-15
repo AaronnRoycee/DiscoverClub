@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
-import { useStore, mapUrlFor, CURRENT_USER_ID } from '../store'
+import { useStore, mapUrlFor } from '../store'
 
 export default function Vote() {
-  const { locationOptions, voteForLocation, members } = useStore()
-  const myVote = locationOptions.find((o) => o.votes.includes(CURRENT_USER_ID))
+  const { locationOptions, voteForLocation, members, currentUserId } = useStore()
+  const myVote = locationOptions.find((o) => o.votes.includes(currentUserId))
 
   return (
     <div className="space-y-5">
@@ -14,7 +14,7 @@ export default function Vote() {
 
       <div className="space-y-3">
         {locationOptions.map((o) => {
-          const isMine = o.votes.includes(CURRENT_USER_ID)
+          const isMine = o.votes.includes(currentUserId)
           const submitter = members.find((m) => m.id === o.submittedBy)
           return (
             <div

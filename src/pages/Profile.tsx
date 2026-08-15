@@ -1,15 +1,23 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
+import { useAuth } from '../auth'
 
 export default function Profile() {
-  const { profile, setProfile } = useStore()
+  const { profile, setProfile, isLive } = useStore()
+  const { signOut } = useAuth()
   const [form, setForm] = useState(profile)
   const [saved, setSaved] = useState(false)
+  const [dirty, setDirty] = useState(false)
 
   const fileRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    if (!dirty) setForm(profile)
+  }, [profile, dirty])
+
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm({ ...form, [key]: e.target.value })
+    setDirty(true)
     setSaved(false)
   }
 
@@ -83,6 +91,15 @@ export default function Profile() {
         </button>
         {saved && <p className="text-center text-sm text-club-green">✔ Profile saved</p>}
       </form>
+
+      {isLive && (
+        <button
+          onClick={() => signOut()}
+          className="w-full cursor-pointer rounded-xl border border-club-border py-2.5 font-semibold text-red-400 hover:bg-club-card2"
+        >
+          Sign Out
+        </button>
+      )}
     </div>
   )
 }

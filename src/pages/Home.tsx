@@ -1,9 +1,9 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { useStore, daysUntil, formatDate, isPast, CURRENT_USER_ID } from '../store'
+import { useStore, daysUntil, formatDate, isPast } from '../store'
 import Stars from '../components/Stars'
 
 export default function Home() {
-  const { profile, meets, hasSubmittedLocation } = useStore()
+  const { profile, meets, hasSubmittedLocation, currentUserId } = useStore()
   const navigate = useNavigate()
 
   const upcoming = meets.filter((m) => !isPast(m.date)).sort((a, b) => a.date.localeCompare(b.date))
@@ -16,7 +16,7 @@ export default function Home() {
     actions.push({ id: 'a1', icon: '❗', title: 'Submit a Location', desc: "You haven't submitted a suggestion yet.", cta: 'Submit Now', link: '/submit' })
   actions.push({ id: 'a2', icon: '🗳️', title: 'Vote for Locations', desc: 'Voting is open! Pick your favorite.', cta: 'Vote Now', link: '/vote' })
   actions.push({ id: 'a4', icon: '💡', title: 'Propose a Meet', desc: 'Suggest the next meet date to the group.', cta: 'Propose', link: '/propose' })
-  if (nextMeet && nextMeet.rsvps[CURRENT_USER_ID] === 'pending')
+  if (nextMeet && nextMeet.rsvps[currentUserId] === 'pending')
     actions.push({ id: 'a3', icon: '📅', title: `RSVP to ${nextMeet.name}`, desc: 'Let the group know if you can make it.', cta: 'RSVP', link: `/meets/${nextMeet.id}` })
 
   return (

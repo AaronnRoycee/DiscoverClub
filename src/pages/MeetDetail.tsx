@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useStore, daysUntil, formatDate, isPast, CURRENT_USER_ID } from '../store'
+import { useStore, daysUntil, formatDate, isPast } from '../store'
 import Stars from '../components/Stars'
 
 export default function MeetDetail() {
   const { id } = useParams()
-  const { meets, members, profile, setRsvp, addReview, addChatMessage, addPhoto } = useStore()
+  const { meets, members, profile, setRsvp, addReview, addChatMessage, addPhoto, currentUserId } = useStore()
   const meet = meets.find((m) => m.id === id)
   const [rating, setRating] = useState(0)
   const [comment, setComment] = useState('')
@@ -21,16 +21,16 @@ export default function MeetDetail() {
   }
 
   const memberById = (mid: string) =>
-    mid === CURRENT_USER_ID
+    mid === currentUserId
       ? { name: profile.name, avatar: profile.avatar }
       : (members.find((m) => m.id === mid) ?? { name: 'Member', avatar: '' })
 
   const past = isPast(meet.date)
   const days = daysUntil(meet.date)
-  const myRsvp = meet.rsvps[CURRENT_USER_ID]
+  const myRsvp = meet.rsvps[currentUserId]
   const yes = Object.values(meet.rsvps).filter((r) => r === 'yes').length
   const no = Object.values(meet.rsvps).filter((r) => r === 'no').length
-  const alreadyReviewed = meet.reviews.some((r) => r.memberId === CURRENT_USER_ID)
+  const alreadyReviewed = meet.reviews.some((r) => r.memberId === currentUserId)
 
   return (
     <div className="space-y-5">
@@ -179,7 +179,7 @@ export default function MeetDetail() {
           {meet.chat.length === 0 && <p className="text-sm text-gray-400">No messages yet. Say hi!</p>}
           {meet.chat.map((c) => {
             const m = memberById(c.memberId)
-            const mine = c.memberId === CURRENT_USER_ID
+            const mine = c.memberId === currentUserId
             return (
               <div key={c.id} className={`flex items-end gap-2 ${mine ? 'flex-row-reverse' : ''}`}>
                 <img src={m.avatar} alt={m.name} className="h-6 w-6 rounded-full bg-club-card2" />

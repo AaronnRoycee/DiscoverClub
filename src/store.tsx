@@ -1,5 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
+import { supabase } from './lib/supabase'
+import { useAuth } from './auth'
 
 export type Rsvp = 'yes' | 'no' | 'pending'
 
@@ -76,8 +78,6 @@ export interface MeetProposal {
   supporters: string[]
   approvedMeetId?: string
 }
-
-export const APPROVAL_THRESHOLD = 5
 
 export function mapUrlFor(name: string, address: string, city: string, state: string, zip: string): string {
   const query = [name, address, city, state, zip].filter(Boolean).join(', ')
@@ -243,9 +243,46 @@ export const initialProposals: MeetProposal[] = [
 
 export const CURRENT_USER_ID = 'u1'
 
+const emptyProfile = (id: string): Profile => ({
+  id,
+  name: '',
+  username: '',
+  avatar: '',
+  bio: '',
+  email: '',
+  phone: '',
+  city: '',
+})
+
+const demoProfile: Profile = {
+  id: CURRENT_USER_ID,
+  name: 'Aaron',
+  username: 'aaron_r',
+  avatar: AVATARS('Aaron'),
+  bio: 'Founder of the food club. Always hunting the best brisket in DFW.',
+  email: 'aaron@discoverclub.app',
+  phone: '(214) 555-0132',
+  city: 'Dallas, TX',
+}
+
+const fmtReviewDate = (iso: string) =>
+  new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+const fmtChatTime = (iso: string) =>
+  new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+const fmtJoined = (iso: string) =>
+  new Date(iso).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+const timeAgo = (iso: string) => {
+  const mins = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000))
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.round(hours / 24)}d ago`
+}
+
 interface Store {
   profile: Profile
   setProfile: (p: Profile) => void
+  currentUserId: string
   members: Member[]
   meets: Meet[]
   notifications: Notification[]
@@ -257,56 +294,323 @@ interface Store {
   setRsvp: (meetId: string, rsvp: Rsvp) => void
   addReview: (meetId: string, rating: number, comment: string) => void
   addChatMessage: (meetId: string, text: string) => void
-  addPhoto: (meetId: string, url: string) => void
+  addPhoto: (meetId: string, dataUrl: string) => void
   proposals: MeetProposal[]
   addProposal: (p: Omit<MeetProposal, 'id' | 'proposedBy' | 'supporters'>) => void
   supportProposal: (id: string) => void
+  approvalThreshold: number
+  isLive: boolean
 }
 
 const StoreContext = createContext<Store | null>(null)
 
+const logError = (context: string) => (res: { error: { message: string } | null }) => {
+  if (res.error) console.error(`[supabase] ${context}:`, res.error.message)
+}
+
+async function uploadDataUrl(userId: string, dataUrl: string): Promise<string | null> {
+  if (!supabase) return null
+  const blob = await (await fetch(dataUrl)).blob()
+  const ext = blob.type.split('/')[1] ?? 'jpg'
+  const path = `${userId}/${crypto.randomUUID()}.${ext}`
+  const { error } = await supabase.storage.from('photos').upload(path, blob, { contentType: blob.type })
+  if (error) {
+    console.error('[supabase] photo upload:', error.message)
+    return null
+  }
+  return supabase.storage.from('photos').getPublicUrl(path).data.publicUrl
+}
+
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const [profile, setProfile] = useState<Profile>({
-    id: CURRENT_USER_ID,
-    name: 'Aaron',
-    username: 'aaron_r',
-    avatar: AVATARS('Aaron'),
-    bio: 'Founder of the food club. Always hunting the best brisket in DFW.',
-    email: 'aaron@discoverclub.app',
-    phone: '(214) 555-0132',
-    city: 'Dallas, TX',
-  })
-  const [meets, setMeets] = useState<Meet[]>(initialMeets)
-  const [notifications, setNotifications] = useState<Notification[]>(initialNotifications)
-  const [locationOptions, setLocationOptions] = useState<LocationOption[]>(initialLocationOptions)
-  const [hasSubmittedLocation, setHasSubmittedLocation] = useState(false)
-  const [proposals, setProposals] = useState<MeetProposal[]>(initialProposals)
+  const { session } = useAuth()
+  const isLive = supabase !== null && session !== null
+  const currentUserId = isLive ? session.user.id : CURRENT_USER_ID
 
-  const markNotificationsRead = () =>
-    setNotifications((ns) => ns.map((n) => ({ ...n, read: true })))
+  const [profile, setProfileState] = useState<Profile>(isLive ? emptyProfile(currentUserId) : demoProfile)
+  const [members, setMembers] = useState<Member[]>(isLive ? [] : initialMembers)
+  const [meets, setMeets] = useState<Meet[]>(isLive ? [] : initialMeets)
+  const [notifications, setNotifications] = useState<Notification[]>(isLive ? [] : initialNotifications)
+  const [locationOptions, setLocationOptions] = useState<LocationOption[]>(isLive ? [] : initialLocationOptions)
+  const [proposals, setProposals] = useState<MeetProposal[]>(isLive ? [] : initialProposals)
 
-  const submitLocation = (loc: Omit<LocationOption, 'id' | 'submittedBy' | 'votes'>) => {
-    setLocationOptions((opts) => [
-      ...opts,
-      { ...loc, id: `l${Date.now()}`, submittedBy: CURRENT_USER_ID, votes: [CURRENT_USER_ID] },
-    ])
-    setHasSubmittedLocation(true)
+  const approvalThreshold = isLive ? Math.max(2, Math.floor(members.length / 2) + 1) : 5
+
+  const loadAll = useCallback(async () => {
+    if (!supabase || !session) return
+    const uid = session.user.id
+    const [profilesRes, meetsRes, rsvpsRes, reviewsRes, chatRes, photosRes, optionsRes, votesRes, proposalsRes, supportersRes, notifsRes] =
+      await Promise.all([
+        supabase.from('profiles').select('*').order('joined_at'),
+        supabase.from('meets').select('*').order('date'),
+        supabase.from('rsvps').select('*'),
+        supabase.from('reviews').select('*').order('created_at'),
+        supabase.from('chat_messages').select('*').order('created_at'),
+        supabase.from('meet_photos').select('*').order('created_at'),
+        supabase.from('location_options').select('*').order('created_at'),
+        supabase.from('location_votes').select('*'),
+        supabase.from('proposals').select('*').order('created_at'),
+        supabase.from('proposal_supporters').select('*'),
+        supabase.from('notifications').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
+      ])
+
+    const profiles = profilesRes.data ?? []
+    setMembers(
+      profiles.map((p) => ({
+        id: p.id,
+        name: p.name || p.username || 'Member',
+        avatar: p.avatar_url || AVATARS(p.name || p.id),
+        role: p.role === 'Organizer' ? 'Organizer' : 'Member',
+        joined: fmtJoined(p.joined_at),
+        bio: p.bio ?? '',
+      })),
+    )
+    const me = profiles.find((p) => p.id === uid)
+    if (me) {
+      setProfileState({
+        id: me.id,
+        name: me.name ?? '',
+        username: me.username ?? '',
+        avatar: me.avatar_url || AVATARS(me.name || me.id),
+        bio: me.bio ?? '',
+        email: me.email ?? '',
+        phone: me.phone ?? '',
+        city: me.city ?? '',
+      })
+    }
+
+    const rsvps = rsvpsRes.data ?? []
+    const reviews = reviewsRes.data ?? []
+    const chat = chatRes.data ?? []
+    const photos = photosRes.data ?? []
+    setMeets(
+      (meetsRes.data ?? []).map((m) => ({
+        id: m.id,
+        name: m.name,
+        location: m.location,
+        address: m.address ?? '',
+        city: [m.city, m.state].filter(Boolean).join(', '),
+        date: m.date,
+        time: m.time,
+        photo: m.photo_url || FOOD_IMG(m.id),
+        mapUrl: m.address ? mapUrlFor(m.location, m.address, m.city, m.state, m.zip) : '',
+        rsvps: Object.fromEntries(
+          rsvps.filter((r) => r.meet_id === m.id).map((r): [string, Rsvp] => [r.user_id, r.status as Rsvp]),
+        ),
+        reviews: reviews
+          .filter((r) => r.meet_id === m.id)
+          .map((r) => ({ id: r.id, memberId: r.user_id, rating: Number(r.rating), comment: r.comment, date: fmtReviewDate(r.created_at) })),
+        photos: photos.filter((p) => p.meet_id === m.id).map((p) => p.url),
+        chat: chat
+          .filter((c) => c.meet_id === m.id)
+          .map((c) => ({ id: c.id, memberId: c.user_id, text: c.text, time: fmtChatTime(c.created_at) })),
+      })),
+    )
+
+    const votes = votesRes.data ?? []
+    setLocationOptions(
+      (optionsRes.data ?? []).map((o) => ({
+        id: o.id,
+        name: o.name,
+        address: o.address ?? '',
+        city: o.city ?? '',
+        state: o.state ?? '',
+        zip: o.zip ?? '',
+        submittedBy: o.submitted_by,
+        votes: votes.filter((v) => v.option_id === o.id).map((v) => v.user_id),
+      })),
+    )
+
+    const supporters = supportersRes.data ?? []
+    setProposals(
+      (proposalsRes.data ?? []).map((p) => ({
+        id: p.id,
+        name: p.name,
+        date: p.date,
+        time: p.time,
+        locationName: p.location_name,
+        address: p.address ?? '',
+        city: p.city ?? '',
+        state: p.state ?? '',
+        zip: p.zip ?? '',
+        proposedBy: p.proposed_by,
+        supporters: supporters.filter((s) => s.proposal_id === p.id).map((s) => s.user_id),
+        approvedMeetId: p.approved_meet_id ?? undefined,
+      })),
+    )
+
+    setNotifications(
+      (notifsRes.data ?? []).map((n) => ({ id: n.id, text: n.text, time: timeAgo(n.created_at), link: n.link, read: n.read })),
+    )
+  }, [session])
+
+  useEffect(() => {
+    if (isLive) loadAll()
+  }, [isLive, loadAll])
+
+  const notifyOthers = (text: string, link: string) => {
+    if (!supabase) return
+    const rows = members
+      .filter((m) => m.id !== currentUserId)
+      .map((m) => ({ user_id: m.id, text, link }))
+    if (rows.length > 0) supabase.from('notifications').insert(rows).then(logError('notify'))
   }
 
-  const addProposal = (p: Omit<MeetProposal, 'id' | 'proposedBy' | 'supporters'>) =>
-    setProposals((ps) => [
-      ...ps,
-      { ...p, id: `p${Date.now()}`, proposedBy: CURRENT_USER_ID, supporters: [CURRENT_USER_ID] },
-    ])
+  const setProfile = (p: Profile) => {
+    setProfileState(p)
+    setMembers((ms) => ms.map((m) => (m.id === p.id ? { ...m, name: p.name, avatar: p.avatar, bio: p.bio } : m)))
+    if (isLive && supabase) {
+      const save = async () => {
+        let avatarUrl = p.avatar
+        if (avatarUrl.startsWith('data:')) {
+          const uploaded = await uploadDataUrl(currentUserId, avatarUrl)
+          if (uploaded) {
+            avatarUrl = uploaded
+            setProfileState((prev) => ({ ...prev, avatar: uploaded }))
+            setMembers((ms) => ms.map((m) => (m.id === p.id ? { ...m, avatar: uploaded } : m)))
+          }
+        }
+        supabase!
+          .from('profiles')
+          .update({ name: p.name, username: p.username, avatar_url: avatarUrl, bio: p.bio, email: p.email, phone: p.phone, city: p.city })
+          .eq('id', currentUserId)
+          .then(logError('update profile'))
+      }
+      save()
+    }
+  }
+
+  const markNotificationsRead = () => {
+    setNotifications((ns) => ns.map((n) => ({ ...n, read: true })))
+    if (isLive && supabase)
+      supabase.from('notifications').update({ read: true }).eq('user_id', currentUserId).then(logError('mark read'))
+  }
+
+  const hasSubmittedLocation = locationOptions.some((o) => o.submittedBy === currentUserId)
+
+  const submitLocation = (loc: Omit<LocationOption, 'id' | 'submittedBy' | 'votes'>) => {
+    const id = crypto.randomUUID()
+    setLocationOptions((opts) => [...opts, { ...loc, id, submittedBy: currentUserId, votes: [currentUserId] }])
+    if (isLive && supabase) {
+      supabase
+        .from('location_options')
+        .insert({ id, name: loc.name, address: loc.address, city: loc.city, state: loc.state, zip: loc.zip, submitted_by: currentUserId })
+        .then((res) => {
+          logError('submit location')(res)
+          if (!res.error) supabase!.from('location_votes').insert({ option_id: id, user_id: currentUserId }).then(logError('self vote'))
+        })
+      notifyOthers(`${profile.name} suggested ${loc.name} — vote now!`, '/vote')
+    }
+  }
+
+  const voteForLocation = (id: string) => {
+    const previous = locationOptions.find((o) => o.votes.includes(currentUserId))
+    const target = locationOptions.find((o) => o.id === id)
+    if (!target) return
+    const isRemoving = previous?.id === id
+    setLocationOptions((opts) =>
+      opts.map((o) => {
+        const votes = o.votes.filter((v) => v !== currentUserId)
+        if (o.id === id && !isRemoving) votes.push(currentUserId)
+        return { ...o, votes }
+      }),
+    )
+    if (isLive && supabase) {
+      const run = async () => {
+        if (previous)
+          await supabase!.from('location_votes').delete().eq('option_id', previous.id).eq('user_id', currentUserId)
+        if (!isRemoving)
+          await supabase!.from('location_votes').insert({ option_id: id, user_id: currentUserId })
+      }
+      run().catch((e) => console.error('[supabase] vote:', e))
+    }
+  }
+
+  const setRsvp = (meetId: string, rsvp: Rsvp) => {
+    setMeets((ms) => ms.map((m) => (m.id === meetId ? { ...m, rsvps: { ...m.rsvps, [currentUserId]: rsvp } } : m)))
+    if (isLive && supabase)
+      supabase.from('rsvps').upsert({ meet_id: meetId, user_id: currentUserId, status: rsvp }).then(logError('rsvp'))
+  }
+
+  const addReview = (meetId: string, rating: number, comment: string) => {
+    const id = crypto.randomUUID()
+    setMeets((ms) =>
+      ms.map((m) =>
+        m.id === meetId
+          ? {
+              ...m,
+              reviews: [
+                ...m.reviews,
+                { id, memberId: currentUserId, rating, comment, date: fmtReviewDate(new Date().toISOString()) },
+              ],
+            }
+          : m,
+      ),
+    )
+    if (isLive && supabase)
+      supabase.from('reviews').insert({ id, meet_id: meetId, user_id: currentUserId, rating, comment }).then(logError('review'))
+  }
+
+  const addChatMessage = (meetId: string, text: string) => {
+    const id = crypto.randomUUID()
+    setMeets((ms) =>
+      ms.map((m) =>
+        m.id === meetId
+          ? { ...m, chat: [...m.chat, { id, memberId: currentUserId, text, time: fmtChatTime(new Date().toISOString()) }] }
+          : m,
+      ),
+    )
+    if (isLive && supabase)
+      supabase.from('chat_messages').insert({ id, meet_id: meetId, user_id: currentUserId, text }).then(logError('chat'))
+  }
+
+  const addPhoto = (meetId: string, dataUrl: string) => {
+    setMeets((ms) => ms.map((m) => (m.id === meetId ? { ...m, photos: [...m.photos, dataUrl] } : m)))
+    if (isLive && supabase) {
+      const run = async () => {
+        const url = await uploadDataUrl(currentUserId, dataUrl)
+        if (!url) return
+        setMeets((ms) =>
+          ms.map((m) => (m.id === meetId ? { ...m, photos: m.photos.map((p) => (p === dataUrl ? url : p)) } : m)),
+        )
+        supabase!.from('meet_photos').insert({ meet_id: meetId, user_id: currentUserId, url }).then(logError('photo'))
+      }
+      run()
+    }
+  }
+
+  const addProposal = (p: Omit<MeetProposal, 'id' | 'proposedBy' | 'supporters'>) => {
+    const id = crypto.randomUUID()
+    setProposals((ps) => [...ps, { ...p, id, proposedBy: currentUserId, supporters: [currentUserId] }])
+    if (isLive && supabase) {
+      supabase
+        .from('proposals')
+        .insert({ id, name: p.name, date: p.date, time: p.time, location_name: p.locationName, address: p.address, city: p.city, state: p.state, zip: p.zip, proposed_by: currentUserId })
+        .then((res) => {
+          logError('proposal')(res)
+          if (!res.error)
+            supabase!.from('proposal_supporters').insert({ proposal_id: id, user_id: currentUserId }).then(logError('self support'))
+        })
+      notifyOthers(`${profile.name} proposed ${p.name} — support it!`, '/propose')
+    }
+  }
 
   const supportProposal = (id: string) => {
     const p = proposals.find((x) => x.id === id)
     if (!p || p.approvedMeetId) return
-    const supporters = p.supporters.includes(CURRENT_USER_ID)
-      ? p.supporters.filter((s) => s !== CURRENT_USER_ID)
-      : [...p.supporters, CURRENT_USER_ID]
-    if (supporters.length >= APPROVAL_THRESHOLD) {
-      const meetId = `m${Date.now()}`
+    const withdrawing = p.supporters.includes(currentUserId)
+    const supporters = withdrawing
+      ? p.supporters.filter((s) => s !== currentUserId)
+      : [...p.supporters, currentUserId]
+
+    if (isLive && supabase) {
+      if (withdrawing)
+        supabase.from('proposal_supporters').delete().eq('proposal_id', id).eq('user_id', currentUserId).then(logError('withdraw'))
+      else supabase.from('proposal_supporters').insert({ proposal_id: id, user_id: currentUserId }).then(logError('support'))
+    }
+
+    if (supporters.length >= approvalThreshold) {
+      const meetId = crypto.randomUUID()
+      const memberIds = members.map((m) => m.id)
       const newMeet: Meet = {
         id: meetId,
         name: p.name,
@@ -317,84 +621,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         time: p.time,
         photo: FOOD_IMG(meetId),
         mapUrl: mapUrlFor(p.locationName, p.address, p.city, p.state, p.zip),
-        rsvps: Object.fromEntries(
-          initialMembers.map((m): [string, Rsvp] => [m.id, supporters.includes(m.id) ? 'yes' : 'pending']),
-        ),
+        rsvps: Object.fromEntries(memberIds.map((mid): [string, Rsvp] => [mid, supporters.includes(mid) ? 'yes' : 'pending'])),
         reviews: [],
         photos: [],
         chat: [],
       }
       setMeets((ms) => [...ms, newMeet])
       setProposals((ps) => ps.map((x) => (x.id === id ? { ...x, supporters, approvedMeetId: meetId } : x)))
+      if (isLive && supabase) {
+        const run = async () => {
+          const { error } = await supabase!
+            .from('meets')
+            .insert({ id: meetId, name: p.name, location: p.locationName, address: p.address, city: p.city, state: p.state, zip: p.zip, date: p.date, time: p.time, photo_url: FOOD_IMG(meetId), created_by: currentUserId })
+          if (error) return console.error('[supabase] approve meet:', error.message)
+          await supabase!.from('rsvps').upsert({ meet_id: meetId, user_id: currentUserId, status: 'yes' })
+          await supabase!.from('proposals').update({ approved_meet_id: meetId }).eq('id', id)
+          notifyOthers(`${p.name} is official — RSVP now!`, `/meets/${meetId}`)
+        }
+        run()
+      }
     } else {
       setProposals((ps) => ps.map((x) => (x.id === id ? { ...x, supporters } : x)))
     }
   }
-
-  const voteForLocation = (id: string) =>
-    setLocationOptions((opts) =>
-      opts.map((o) => {
-        const votes = o.votes.filter((v) => v !== CURRENT_USER_ID)
-        if (o.id === id && !o.votes.includes(CURRENT_USER_ID)) votes.push(CURRENT_USER_ID)
-        return { ...o, votes }
-      }),
-    )
-
-  const setRsvp = (meetId: string, rsvp: Rsvp) =>
-    setMeets((ms) =>
-      ms.map((m) => (m.id === meetId ? { ...m, rsvps: { ...m.rsvps, [CURRENT_USER_ID]: rsvp } } : m)),
-    )
-
-  const addReview = (meetId: string, rating: number, comment: string) =>
-    setMeets((ms) =>
-      ms.map((m) =>
-        m.id === meetId
-          ? {
-              ...m,
-              reviews: [
-                ...m.reviews,
-                {
-                  id: `r${Date.now()}`,
-                  memberId: CURRENT_USER_ID,
-                  rating,
-                  comment,
-                  date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-                },
-              ],
-            }
-          : m,
-      ),
-    )
-
-  const addChatMessage = (meetId: string, text: string) =>
-    setMeets((ms) =>
-      ms.map((m) =>
-        m.id === meetId
-          ? {
-              ...m,
-              chat: [
-                ...m.chat,
-                {
-                  id: `c${Date.now()}`,
-                  memberId: CURRENT_USER_ID,
-                  text,
-                  time: new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-                },
-              ],
-            }
-          : m,
-      ),
-    )
-
-  const addPhoto = (meetId: string, url: string) =>
-    setMeets((ms) => (ms.map((m) => (m.id === meetId ? { ...m, photos: [...m.photos, url] } : m))))
 
   return (
     <StoreContext.Provider
       value={{
         profile,
         setProfile,
-        members: initialMembers,
+        currentUserId,
+        members,
         meets,
         notifications,
         markNotificationsRead,
@@ -409,6 +666,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         proposals,
         addProposal,
         supportProposal,
+        approvalThreshold,
+        isLive,
       }}
     >
       {children}
