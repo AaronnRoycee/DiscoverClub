@@ -635,6 +635,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           })
           if (error) return console.error('[supabase] approve meet:', error.message)
           notifyOthers(`${p.name} is official — RSVP now!`, `/meets/${meetId}`)
+          supabase!.functions
+            .invoke('send-meet-alert', {
+              body: {
+                meetName: p.name,
+                meetDate: formatDate(p.date),
+                meetTime: p.time,
+                meetLocation: [p.locationName, p.address, p.city, p.state].filter(Boolean).join(', '),
+                meetLink: `${window.location.origin}/meets/${meetId}`,
+              },
+            })
+            .catch((e: unknown) => console.warn('[supabase] email alert (function not deployed?):', e))
         }
         run()
       }
