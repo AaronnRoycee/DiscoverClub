@@ -300,6 +300,9 @@ interface Store {
   supportProposal: (id: string) => void
   approvalThreshold: number
   isLive: boolean
+  membershipStatus: 'loading' | 'pending' | 'approved'
+  pendingMembers: Member[]
+  approveMember: (id: string) => void
 }
 
 const StoreContext = createContext<Store | null>(null)
@@ -328,6 +331,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const [profile, setProfileState] = useState<Profile>(isLive ? emptyProfile(currentUserId) : demoProfile)
   const [members, setMembers] = useState<Member[]>(isLive ? [] : initialMembers)
+  const [pendingMembers, setPendingMembers] = useState<Member[]>([])
+  const [membershipStatus, setMembershipStatus] = useState<'loading' | 'pending' | 'approved'>(isLive ? 'loading' : 'approved')
   const [meets, setMeets] = useState<Meet[]>(isLive ? [] : initialMeets)
   const [notifications, setNotifications] = useState<Notification[]>(isLive ? [] : initialNotifications)
   const [locationOptions, setLocationOptions] = useState<LocationOption[]>(isLive ? [] : initialLocationOptions)
@@ -354,18 +359,19 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ])
 
     const profiles = profilesRes.data ?? []
-    setMembers(
-      profiles.map((p) => ({
-        id: p.id,
-        name: p.name || p.username || 'Member',
-        avatar: p.avatar_url || AVATARS(p.name || p.id),
-        role: p.role === 'Organizer' ? 'Organizer' : 'Member',
-        joined: fmtJoined(p.joined_at),
-        bio: p.bio ?? '',
-      })),
-    )
+    const toMember = (p: (typeof profiles)[number]): Member => ({
+      id: p.id,
+      name: p.name || p.username || 'Member',
+      avatar: p.avatar_url || AVATARS(p.name || p.id),
+      role: p.role === 'Organizer' ? 'Organizer' : 'Member',
+      joined: fmtJoined(p.joined_at),
+      bio: p.bio ?? '',
+    })
+    setMembers(profiles.filter((p) => p.status === 'approved').map(toMember))
+    setPendingMembers(profiles.filter((p) => p.status === 'pending').map(toMember))
     const me = profiles.find((p) => p.id === uid)
     if (me) {
+      setMembershipStatus(me.status === 'approved' ? 'approved' : 'pending')
       setProfileState({
         id: me.id,
         name: me.name ?? '',
@@ -476,6 +482,27 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           .then(logError('update profile'))
       }
       save()
+    }
+  }
+
+  const approveMember = (id: string) => {
+    const m = pendingMembers.find((x) => x.id === id)
+    if (!m) return
+    setPendingMembers((ps) => ps.filter((x) => x.id !== id))
+    setMembers((ms) => [...ms, m])
+    if (isLive && supabase) {
+      supabase
+        .from('profiles')
+        .update({ status: 'approved' })
+        .eq('id', id)
+        .then((res) => {
+          logError('approve member')(res)
+          if (!res.error)
+            supabase!
+              .from('notifications')
+              .insert({ user_id: id, text: `Welcome to DiscoverClub! ${profile.name} approved you.`, link: '/' })
+              .then(logError('welcome notification'))
+        })
     }
   }
 
@@ -682,6 +709,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supportProposal,
         approvalThreshold,
         isLive,
+        membershipStatus,
+        pendingMembers,
+        approveMember,
       }}
     >
       {children}
