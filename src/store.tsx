@@ -74,7 +74,10 @@ export interface MeetProposal {
   zip: string
   proposedBy: string
   supporters: string[]
+  approvedMeetId?: string
 }
+
+export const APPROVAL_THRESHOLD = 5
 
 export function mapUrlFor(name: string, address: string, city: string, state: string, zip: string): string {
   const query = [name, address, city, state, zip].filter(Boolean).join(', ')
@@ -234,7 +237,7 @@ export const initialProposals: MeetProposal[] = [
     state: 'TX',
     zip: '75034',
     proposedBy: 'u3',
-    supporters: ['u3', 'u5'],
+    supporters: ['u3', 'u5', 'u2', 'u7'],
   },
 ]
 
@@ -296,19 +299,37 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       { ...p, id: `p${Date.now()}`, proposedBy: CURRENT_USER_ID, supporters: [CURRENT_USER_ID] },
     ])
 
-  const supportProposal = (id: string) =>
-    setProposals((ps) =>
-      ps.map((p) =>
-        p.id === id
-          ? {
-              ...p,
-              supporters: p.supporters.includes(CURRENT_USER_ID)
-                ? p.supporters.filter((s) => s !== CURRENT_USER_ID)
-                : [...p.supporters, CURRENT_USER_ID],
-            }
-          : p,
-      ),
-    )
+  const supportProposal = (id: string) => {
+    const p = proposals.find((x) => x.id === id)
+    if (!p || p.approvedMeetId) return
+    const supporters = p.supporters.includes(CURRENT_USER_ID)
+      ? p.supporters.filter((s) => s !== CURRENT_USER_ID)
+      : [...p.supporters, CURRENT_USER_ID]
+    if (supporters.length >= APPROVAL_THRESHOLD) {
+      const meetId = `m${Date.now()}`
+      const newMeet: Meet = {
+        id: meetId,
+        name: p.name,
+        location: p.locationName,
+        address: p.address,
+        city: [p.city, p.state].filter(Boolean).join(', '),
+        date: p.date,
+        time: p.time,
+        photo: FOOD_IMG(meetId),
+        mapUrl: mapUrlFor(p.locationName, p.address, p.city, p.state, p.zip),
+        rsvps: Object.fromEntries(
+          initialMembers.map((m): [string, Rsvp] => [m.id, supporters.includes(m.id) ? 'yes' : 'pending']),
+        ),
+        reviews: [],
+        photos: [],
+        chat: [],
+      }
+      setMeets((ms) => [...ms, newMeet])
+      setProposals((ps) => ps.map((x) => (x.id === id ? { ...x, supporters, approvedMeetId: meetId } : x)))
+    } else {
+      setProposals((ps) => ps.map((x) => (x.id === id ? { ...x, supporters } : x)))
+    }
+  }
 
   const voteForLocation = (id: string) =>
     setLocationOptions((opts) =>
