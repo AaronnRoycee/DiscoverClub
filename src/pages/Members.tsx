@@ -1,15 +1,17 @@
 import { useStore } from '../store'
 
 export default function Members() {
-  const { members, pendingMembers, approveMember, currentUserId } = useStore()
-  const isOrganizer = members.find((m) => m.id === currentUserId)?.role === 'Organizer'
+  const { members, pendingMembers, approveMember, setMemberRole, currentUserId } = useStore()
+  const myRole = members.find((m) => m.id === currentUserId)?.role
+  const isOrganizer = myRole === 'Organizer'
+  const canApprove = isOrganizer || myRole === 'Admin'
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold">Members</h1>
         <p className="mt-1 text-gray-400">{members.length} people in the club</p>
       </div>
-      {isOrganizer && pendingMembers.length > 0 && (
+      {canApprove && pendingMembers.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-club-green">Waiting for approval</h2>
           {pendingMembers.map((m) => (
@@ -36,13 +38,21 @@ export default function Members() {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
                 <p className="font-semibold">{m.name}</p>
-                {m.role === 'Organizer' && (
-                  <span className="rounded-full bg-club-green-dark px-2 py-0.5 text-xs font-semibold text-club-green">Organizer</span>
+                {m.role !== 'Member' && (
+                  <span className="rounded-full bg-club-green-dark px-2 py-0.5 text-xs font-semibold text-club-green">{m.role}</span>
                 )}
               </div>
               <p className="mt-0.5 truncate text-sm text-gray-400">{m.bio}</p>
               <p className="mt-0.5 text-xs text-gray-500">Joined {m.joined}</p>
             </div>
+            {isOrganizer && m.role !== 'Organizer' && (
+              <button
+                onClick={() => setMemberRole(m.id, m.role === 'Admin' ? 'Member' : 'Admin')}
+                className="shrink-0 rounded-full border border-club-border px-3 py-1.5 text-xs font-semibold text-gray-300"
+              >
+                {m.role === 'Admin' ? 'Remove Admin' : 'Make Admin'}
+              </button>
+            )}
           </div>
         ))}
       </div>

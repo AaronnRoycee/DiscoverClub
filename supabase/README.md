@@ -10,6 +10,8 @@
    This creates all tables, row-level security policies, the auto-profile trigger, and the photo storage bucket.
 3. Then paste the entire contents of `migration-invite-only.sql` and click **Run**.
    This makes the club invite-only: the first signup becomes the approved Organizer; everyone after signs up as *pending* and sees a waiting screen until an Organizer approves them on the Members page. Only approved members can read or write club data.
+4. Then paste the entire contents of `migration-admin-role.sql` and click **Run**.
+   This adds the Admin role: the Organizer can promote/demote members to Admin on the Members page, and Admins can also approve join requests (but cannot change roles).
 
 ## 3. Connect the app
 1. In the dashboard, go to **Project Settings → API**.

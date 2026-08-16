@@ -9,7 +9,7 @@ export interface Member {
   id: string
   name: string
   avatar: string
-  role: 'Organizer' | 'Member'
+  role: 'Organizer' | 'Admin' | 'Member'
   joined: string
   bio: string
 }
@@ -303,6 +303,7 @@ interface Store {
   membershipStatus: 'loading' | 'pending' | 'approved'
   pendingMembers: Member[]
   approveMember: (id: string) => void
+  setMemberRole: (id: string, role: 'Admin' | 'Member') => void
 }
 
 const StoreContext = createContext<Store | null>(null)
@@ -363,7 +364,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       id: p.id,
       name: p.name || p.username || 'Member',
       avatar: p.avatar_url || AVATARS(p.name || p.id),
-      role: p.role === 'Organizer' ? 'Organizer' : 'Member',
+      role: p.role === 'Organizer' || p.role === 'Admin' ? p.role : 'Member',
       joined: fmtJoined(p.joined_at),
       bio: p.bio ?? '',
     })
@@ -502,6 +503,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               .from('notifications')
               .insert({ user_id: id, text: `Welcome to DiscoverClub! ${profile.name} approved you.`, link: '/' })
               .then(logError('welcome notification'))
+        })
+    }
+  }
+
+  const setMemberRole = (id: string, role: 'Admin' | 'Member') => {
+    setMembers((ms) => ms.map((m) => (m.id === id ? { ...m, role } : m)))
+    if (isLive && supabase) {
+      supabase
+        .from('profiles')
+        .update({ role })
+        .eq('id', id)
+        .then((res) => {
+          logError('set member role')(res)
+          if (!res.error && role === 'Admin')
+            supabase!
+              .from('notifications')
+              .insert({ user_id: id, text: `${profile.name} made you an Admin — you can now approve new members!`, link: '/members' })
+              .then(logError('admin notification'))
         })
     }
   }
@@ -712,6 +731,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         membershipStatus,
         pendingMembers,
         approveMember,
+        setMemberRole,
       }}
     >
       {children}
