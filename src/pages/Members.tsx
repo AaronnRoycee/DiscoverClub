@@ -1,16 +1,37 @@
+import { useState } from 'react'
 import { useStore } from '../store'
 
 export default function Members() {
-  const { members, pendingMembers, approveMember, setMemberRole, currentUserId } = useStore()
+  const { members, pendingMembers, approveMember, setMemberRole, currentUserId, club, isLive } = useStore()
+  const [copied, setCopied] = useState(false)
   const myRole = members.find((m) => m.id === currentUserId)?.role
   const isOrganizer = myRole === 'Organizer'
   const canApprove = isOrganizer || myRole === 'Admin'
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold">Members</h1>
+        <h1 className="text-2xl font-bold">{club && isLive ? club.name : 'Members'}</h1>
         <p className="mt-1 text-gray-400">{members.length} people in the club</p>
       </div>
+      {canApprove && club && isLive && (
+        <div className="flex items-center gap-4 rounded-2xl border border-club-border bg-club-card p-4">
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-gray-300">Group invite code</p>
+            <p className="mt-0.5 font-mono text-xl tracking-widest text-club-green">{club.code}</p>
+            <p className="mt-0.5 text-xs text-gray-500">Share it with friends so they can join — you approve them here.</p>
+          </div>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(club.code)
+              setCopied(true)
+              setTimeout(() => setCopied(false), 2000)
+            }}
+            className="shrink-0 rounded-full border border-club-border px-3 py-1.5 text-xs font-semibold text-gray-300"
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
+      )}
       {canApprove && pendingMembers.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-club-green">Waiting for approval</h2>

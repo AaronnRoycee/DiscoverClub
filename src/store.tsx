@@ -84,6 +84,12 @@ export function mapUrlFor(name: string, address: string, city: string, state: st
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 }
 
+export interface Club {
+  id: string
+  name: string
+  code: string
+}
+
 export interface Profile {
   id: string
   name: string
@@ -300,7 +306,10 @@ interface Store {
   supportProposal: (id: string) => void
   approvalThreshold: number
   isLive: boolean
-  membershipStatus: 'loading' | 'pending' | 'approved'
+  membershipStatus: 'loading' | 'noclub' | 'pending' | 'approved'
+  club: Club | null
+  createClub: (name: string) => Promise<string | null>
+  joinClub: (code: string) => Promise<boolean>
   pendingMembers: Member[]
   approveMember: (id: string) => void
   setMemberRole: (id: string, role: 'Admin' | 'Member') => void
@@ -333,7 +342,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [profile, setProfileState] = useState<Profile>(isLive ? emptyProfile(currentUserId) : demoProfile)
   const [members, setMembers] = useState<Member[]>(isLive ? [] : initialMembers)
   const [pendingMembers, setPendingMembers] = useState<Member[]>([])
-  const [membershipStatus, setMembershipStatus] = useState<'loading' | 'pending' | 'approved'>(isLive ? 'loading' : 'approved')
+  const [membershipStatus, setMembershipStatus] = useState<'loading' | 'noclub' | 'pending' | 'approved'>(isLive ? 'loading' : 'approved')
+  const [club, setClub] = useState<Club | null>(isLive ? null : { id: 'demo', name: 'DiscoverClub', code: 'DEMO42' })
   const [meets, setMeets] = useState<Meet[]>(isLive ? [] : initialMeets)
   const [notifications, setNotifications] = useState<Notification[]>(isLive ? [] : initialNotifications)
   const [locationOptions, setLocationOptions] = useState<LocationOption[]>(isLive ? [] : initialLocationOptions)
@@ -344,9 +354,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const loadAll = useCallback(async () => {
     if (!supabase || !session) return
     const uid = session.user.id
-    const [profilesRes, meetsRes, rsvpsRes, reviewsRes, chatRes, photosRes, optionsRes, votesRes, proposalsRes, supportersRes, notifsRes] =
+    const [profilesRes, clubRes, meetsRes, rsvpsRes, reviewsRes, chatRes, photosRes, optionsRes, votesRes, proposalsRes, supportersRes, notifsRes] =
       await Promise.all([
         supabase.from('profiles').select('*').order('joined_at'),
+        supabase.from('clubs').select('*').maybeSingle(),
         supabase.from('meets').select('*').order('date'),
         supabase.from('rsvps').select('*'),
         supabase.from('reviews').select('*').order('created_at'),
@@ -370,9 +381,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     })
     setMembers(profiles.filter((p) => p.status === 'approved').map(toMember))
     setPendingMembers(profiles.filter((p) => p.status === 'pending').map(toMember))
+    setClub(clubRes.data ? { id: clubRes.data.id, name: clubRes.data.name, code: clubRes.data.code } : null)
     const me = profiles.find((p) => p.id === uid)
     if (me) {
-      setMembershipStatus(me.status === 'approved' ? 'approved' : 'pending')
+      setMembershipStatus(!me.club_id ? 'noclub' : me.status === 'approved' ? 'approved' : 'pending')
       setProfileState({
         id: me.id,
         name: me.name ?? '',
@@ -484,6 +496,28 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       save()
     }
+  }
+
+  const createClub = async (name: string): Promise<string | null> => {
+    if (!isLive || !supabase) return null
+    const { data, error } = await supabase.rpc('create_club', { p_name: name })
+    if (error) {
+      console.error('[supabase] create club:', error.message)
+      return null
+    }
+    await loadAll()
+    return data as string
+  }
+
+  const joinClub = async (code: string): Promise<boolean> => {
+    if (!isLive || !supabase) return false
+    const { data, error } = await supabase.rpc('join_club', { p_code: code })
+    if (error) {
+      console.error('[supabase] join club:', error.message)
+      return false
+    }
+    if (data) await loadAll()
+    return !!data
   }
 
   const approveMember = (id: string) => {
@@ -729,6 +763,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         approvalThreshold,
         isLive,
         membershipStatus,
+        club,
+        createClub,
+        joinClub,
         pendingMembers,
         approveMember,
         setMemberRole,
