@@ -4,6 +4,7 @@ import { useStore } from '../store'
 export default function Members() {
   const { members, pendingMembers, approveMember, setMemberRole, currentUserId, club, isLive } = useStore()
   const [copied, setCopied] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const myRole = members.find((m) => m.id === currentUserId)?.role
   const isOrganizer = myRole === 'Organizer'
   const canApprove = isOrganizer || myRole === 'Admin'
@@ -14,22 +15,41 @@ export default function Members() {
         <p className="mt-1 text-gray-400">{members.length} people in the club</p>
       </div>
       {canApprove && club && isLive && (
-        <div className="flex items-center gap-4 rounded-2xl border border-club-border bg-club-card p-4">
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-gray-300">Group invite code</p>
-            <p className="mt-0.5 font-mono text-xl tracking-widest text-club-green">{club.code}</p>
-            <p className="mt-0.5 text-xs text-gray-500">Share it with friends so they can join — you approve them here.</p>
+        <div className="rounded-2xl border border-club-border bg-club-card p-4">
+          <div className="flex items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-gray-300">Group invite code</p>
+              <p className="mt-0.5 font-mono text-xl tracking-widest text-club-green">{club.code}</p>
+              <p className="mt-0.5 text-xs text-gray-500">Share the code or the link below. You approve everyone who joins.</p>
+            </div>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(club.code)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }}
+              className="shrink-0 rounded-full border border-club-border px-3 py-1.5 text-xs font-semibold text-gray-300"
+            >
+              {copied ? 'Copied!' : 'Copy code'}
+            </button>
           </div>
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(club.code)
-              setCopied(true)
-              setTimeout(() => setCopied(false), 2000)
-            }}
-            className="shrink-0 rounded-full border border-club-border px-3 py-1.5 text-xs font-semibold text-gray-300"
-          >
-            {copied ? 'Copied!' : 'Copy'}
-          </button>
+          <div className="mt-3 flex items-center gap-3">
+            <input
+              readOnly
+              value={`${window.location.origin}${import.meta.env.BASE_URL}?code=${club.code}`}
+              className="min-w-0 flex-1 truncate rounded-xl border border-club-border bg-club-bg px-3 py-2 text-sm text-gray-400"
+            />
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}${import.meta.env.BASE_URL}?code=${club.code}`)
+                setLinkCopied(true)
+                setTimeout(() => setLinkCopied(false), 2000)
+              }}
+              className="shrink-0 rounded-full bg-club-green px-3 py-2 text-xs font-semibold text-club-bg"
+            >
+              {linkCopied ? 'Copied!' : 'Copy link'}
+            </button>
+          </div>
         </div>
       )}
       {canApprove && pendingMembers.length > 0 && (

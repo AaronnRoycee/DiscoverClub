@@ -1,5 +1,5 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import { useState, type ReactNode } from 'react'
+import { BrowserRouter, Routes, Route, useSearchParams } from 'react-router-dom'
+import { useEffect, useState, type ReactNode } from 'react'
 import { StoreProvider, useStore } from './store'
 import { AuthProvider, useAuth } from './auth'
 import Layout from './components/Layout'
@@ -17,12 +17,21 @@ import Auth from './pages/Auth'
 function CreateOrJoinGroup() {
   const { profile, createClub, joinClub } = useStore()
   const { signOut } = useAuth()
+  const [searchParams] = useSearchParams()
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose')
   const [groupName, setGroupName] = useState('')
   const [groupCode, setGroupCode] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    const inviteCode = searchParams.get('code')
+    if (inviteCode) {
+      setCode(inviteCode)
+      setMode('join')
+    }
+  }, [searchParams])
 
   const submitCreate = async () => {
     if (!groupName.trim() || !groupCode.trim() || busy) return
@@ -82,9 +91,9 @@ function CreateOrJoinGroup() {
           />
           <input
             value={groupCode}
-            onChange={(e) => setGroupCode(e.target.value.toUpperCase())}
+            onChange={(e) => setGroupCode(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && submitCreate()}
-            placeholder="Group code (e.g. ROYCEFAM)"
+            placeholder="Group code (e.g. RoyceFam)"
             className="rounded-xl border border-club-border bg-club-card px-4 py-3 text-center font-mono tracking-widest text-white placeholder-gray-500 outline-none focus:border-club-green"
           />
           <button
@@ -104,9 +113,9 @@ function CreateOrJoinGroup() {
           <p className="text-gray-400">Enter the group code shared by the group's creator or an admin.</p>
           <input
             value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            onChange={(e) => setCode(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && submitJoin()}
-            placeholder="Group code (e.g. 4F7A2C)"
+            placeholder="Group code (e.g. RoyceFam)"
             className="rounded-xl border border-club-border bg-club-card px-4 py-3 text-center font-mono tracking-widest text-white placeholder-gray-500 outline-none focus:border-club-green"
             autoFocus
           />

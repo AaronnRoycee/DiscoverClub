@@ -103,7 +103,7 @@ begin
   if coalesce(trim(p_name), '') = '' then
     raise exception 'Group name is required';
   end if;
-  v_code := upper(trim(p_code));
+  v_code := trim(p_code);
   if length(v_code) < 3 then
     raise exception 'Group code must be at least 3 characters';
   end if;
@@ -139,7 +139,7 @@ begin
   if (select club_id from public.profiles where id = auth.uid()) is not null then
     raise exception 'You are already in a group';
   end if;
-  select id into v_club from public.clubs where code = upper(trim(p_code));
+  select id into v_club from public.clubs where code = trim(p_code);
   if not found then
     return false;
   end if;

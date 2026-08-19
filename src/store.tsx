@@ -500,7 +500,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const createClub = async (name: string, code: string): Promise<string | null> => {
     if (!isLive || !supabase) return null
-    const { data, error } = await supabase.rpc('create_club', { p_name: name, p_code: code.trim().toUpperCase() })
+    const { data, error } = await supabase.rpc('create_club', { p_name: name, p_code: code.trim() })
     if (error) {
       console.error('[supabase] create club:', error.message)
       return null
