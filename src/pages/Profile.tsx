@@ -77,9 +77,6 @@ export default function Profile() {
         <Field label="Bio">
           <textarea value={form.bio} onChange={set('bio')} rows={3} className={inputCls} />
         </Field>
-        <Field label="Email">
-          <input type="email" value={form.email} onChange={set('email')} className={inputCls} />
-        </Field>
         <Field label="Phone">
           <input value={form.phone} onChange={set('phone')} className={inputCls} />
         </Field>

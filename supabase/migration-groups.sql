@@ -88,7 +88,7 @@ alter table public.proposals alter column club_id set default public.my_club_id(
 
 -- ============ CREATE / JOIN GROUP ============
 
-create or replace function public.create_club(p_name text)
+create or replace function public.create_club(p_name text, p_code text)
 returns text
 language plpgsql
 security definer set search_path = public
@@ -103,13 +103,16 @@ begin
   if coalesce(trim(p_name), '') = '' then
     raise exception 'Group name is required';
   end if;
+  v_code := upper(trim(p_code));
+  if length(v_code) < 3 then
+    raise exception 'Group code must be at least 3 characters';
+  end if;
+  if exists (select 1 from public.clubs where code = v_code) then
+    raise exception 'Group code is already taken';
+  end if;
   if (select club_id from public.profiles where id = auth.uid()) is not null then
     raise exception 'You are already in a group';
   end if;
-  loop
-    v_code := upper(substr(md5(gen_random_uuid()::text), 1, 6));
-    exit when not exists (select 1 from public.clubs where code = v_code);
-  end loop;
   insert into public.clubs (name, code, created_by)
   values (trim(p_name), v_code, auth.uid())
   returning id into v_club;
@@ -155,8 +158,8 @@ begin
 end;
 $$;
 
-revoke execute on function public.create_club(text), public.join_club(text) from public, anon;
-grant execute on function public.create_club(text), public.join_club(text) to authenticated;
+revoke execute on function public.create_club(text, text), public.join_club(text) from public, anon;
+grant execute on function public.create_club(text, text), public.join_club(text) to authenticated;
 
 -- ============ SIGNUP: no auto-organizer; users create/join a group instead ============
 
@@ -169,9 +172,9 @@ begin
   insert into public.profiles (id, name, username, email, role, status)
   values (
     new.id,
-    coalesce(new.raw_user_meta_data ->> 'name', split_part(new.email, '@', 1)),
-    split_part(new.email, '@', 1),
-    new.email,
+    coalesce(new.raw_user_meta_data ->> 'name', split_part(new.email, '@', 1), ''),
+    coalesce(split_part(new.email, '@', 1), ''),
+    coalesce(new.email, ''),
     'Member',
     'pending'
   );

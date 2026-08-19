@@ -308,7 +308,7 @@ interface Store {
   isLive: boolean
   membershipStatus: 'loading' | 'noclub' | 'pending' | 'approved'
   club: Club | null
-  createClub: (name: string) => Promise<string | null>
+  createClub: (name: string, code: string) => Promise<string | null>
   joinClub: (code: string) => Promise<boolean>
   pendingMembers: Member[]
   approveMember: (id: string) => void
@@ -498,9 +498,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const createClub = async (name: string): Promise<string | null> => {
+  const createClub = async (name: string, code: string): Promise<string | null> => {
     if (!isLive || !supabase) return null
-    const { data, error } = await supabase.rpc('create_club', { p_name: name })
+    const { data, error } = await supabase.rpc('create_club', { p_name: name, p_code: code.trim().toUpperCase() })
     if (error) {
       console.error('[supabase] create club:', error.message)
       return null

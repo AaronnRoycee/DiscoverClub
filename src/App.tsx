@@ -18,18 +18,19 @@ function CreateOrJoinGroup() {
   const { profile, createClub, joinClub } = useStore()
   const { signOut } = useAuth()
   const [mode, setMode] = useState<'choose' | 'create' | 'join'>('choose')
-  const [name, setName] = useState('')
+  const [groupName, setGroupName] = useState('')
+  const [groupCode, setGroupCode] = useState('')
   const [code, setCode] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
 
   const submitCreate = async () => {
-    if (!name.trim() || busy) return
+    if (!groupName.trim() || !groupCode.trim() || busy) return
     setBusy(true)
     setError('')
-    const result = await createClub(name)
+    const result = await createClub(groupName, groupCode)
     if (!result) {
-      setError('Could not create the group. Please try again.')
+      setError('Could not create the group. The code may already be taken. Please try a different one.')
       setBusy(false)
     }
   }
@@ -70,18 +71,25 @@ function CreateOrJoinGroup() {
       )}
       {mode === 'create' && (
         <div className="flex w-full max-w-xs flex-col gap-3">
-          <p className="text-gray-400">Name your group — you'll be its organizer and get a shareable invite code.</p>
+          <p className="text-gray-400">Name your group and choose a unique code to share with members.</p>
           <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && submitCreate()}
             placeholder="Group name"
             className="rounded-xl border border-club-border bg-club-card px-4 py-3 text-white placeholder-gray-500 outline-none focus:border-club-green"
             autoFocus
           />
+          <input
+            value={groupCode}
+            onChange={(e) => setGroupCode(e.target.value.toUpperCase())}
+            onKeyDown={(e) => e.key === 'Enter' && submitCreate()}
+            placeholder="Group code (e.g. ROYCEFAM)"
+            className="rounded-xl border border-club-border bg-club-card px-4 py-3 text-center font-mono tracking-widest text-white placeholder-gray-500 outline-none focus:border-club-green"
+          />
           <button
             onClick={submitCreate}
-            disabled={!name.trim() || busy}
+            disabled={!groupName.trim() || !groupCode.trim() || busy}
             className="rounded-full bg-club-green px-5 py-3 font-semibold text-club-bg disabled:opacity-50"
           >
             {busy ? 'Creating…' : 'Create group'}

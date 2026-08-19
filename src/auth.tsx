@@ -6,8 +6,7 @@ interface AuthState {
   session: Session | null
   loading: boolean
   isConfigured: boolean
-  signUp: (email: string, password: string, name: string) => Promise<string | null>
-  signIn: (email: string, password: string) => Promise<string | null>
+  signInAnonymous: (name?: string) => Promise<string | null>
   signOut: () => Promise<void>
 }
 
@@ -29,19 +28,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => sub.subscription.unsubscribe()
   }, [])
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const signInAnonymous = async (name?: string) => {
     if (!supabase) return 'Backend not configured'
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { name }, emailRedirectTo: window.location.origin + import.meta.env.BASE_URL },
+    const { error } = await supabase.auth.signInAnonymously({
+      options: name ? { data: { name } } : undefined,
     })
-    return error ? error.message : null
-  }
-
-  const signIn = async (email: string, password: string) => {
-    if (!supabase) return 'Backend not configured'
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
     return error ? error.message : null
   }
 
@@ -50,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, loading, isConfigured, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, loading, isConfigured, signInAnonymous, signOut }}>
       {children}
     </AuthContext.Provider>
   )
