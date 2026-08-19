@@ -23,10 +23,19 @@
 
 Without `.env.local`, the app runs in demo mode with sample data (no login, resets on refresh).
 
-## 4. Groups and roles
+## 4. Set the confirmation email redirect URL
+So confirmation emails send people back to the live site instead of `localhost`:
+
+1. In the Supabase dashboard, go to **Authentication → URL Configuration**.
+2. Set **Site URL** to `https://aaronnroycee.github.io/DiscoverClub/`.
+3. Add `https://aaronnroycee.github.io/DiscoverClub/` under **Redirect URLs**.
+
+The app passes this URL to `signUp` automatically, but Supabase will only use it if it is in the allowed list.
+
+## 5. Groups and roles
 After signing up, each user creates a group (becoming its **Organizer**) or joins one with an invite code (shown to Organizers/Admins on the Members page). Joiners wait on the pending screen until an Organizer or Admin taps **Approve** on the Members page. The Organizer can promote/demote Admins there too.
 
-## 5. Email meet alerts (optional, free)
+## 6. Email meet alerts (optional, free)
 Auth emails (confirmation, password reset) are built into Supabase.
 For "new meet approved" alert emails:
 1. Sign up at https://resend.com (free: 100 emails/day) and create an API key.
