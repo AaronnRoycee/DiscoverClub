@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
-  base: mode === 'production' ? '/DiscoverClub/' : '/',
+  base: process.env.VERCEL ? '/' : (mode === 'production' ? '/DiscoverClub/' : '/'),
   plugins: [react(), tailwindcss()],
   server: {
     host: true,
