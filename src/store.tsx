@@ -295,6 +295,7 @@ interface Store {
   markNotificationsRead: () => void
   locationOptions: LocationOption[]
   submitLocation: (loc: Omit<LocationOption, 'id' | 'submittedBy' | 'votes'>) => void
+  editLocation: (id: string, loc: Omit<LocationOption, 'id' | 'submittedBy' | 'votes'>) => void
   hasSubmittedLocation: boolean
   voteForLocation: (id: string) => void
   setRsvp: (meetId: string, rsvp: Rsvp) => void
@@ -582,6 +583,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const editLocation = (id: string, loc: Omit<LocationOption, 'id' | 'submittedBy' | 'votes'>) => {
+    setLocationOptions((opts) => opts.map((o) => (o.id === id ? { ...o, ...loc } : o)))
+    if (isLive && supabase)
+      supabase.from('location_options').update({ name: loc.name, address: loc.address, city: loc.city, state: loc.state, zip: loc.zip }).eq('id', id).then(logError('edit location'))
+  }
+
   const voteForLocation = (id: string) => {
     const previous = locationOptions.find((o) => o.votes.includes(currentUserId))
     const target = locationOptions.find((o) => o.id === id)
@@ -751,6 +758,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         markNotificationsRead,
         locationOptions,
         submitLocation,
+        editLocation,
         hasSubmittedLocation,
         voteForLocation,
         setRsvp,

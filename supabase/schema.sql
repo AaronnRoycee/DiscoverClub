@@ -219,6 +219,7 @@ create policy "users delete own photos" on public.meet_photos for delete to auth
 -- location options
 create policy "members can view options" on public.location_options for select to authenticated using (true);
 create policy "users submit own options" on public.location_options for insert to authenticated with check (auth.uid() = submitted_by);
+create policy "users update own options" on public.location_options for update to authenticated using (auth.uid() = submitted_by) with check (auth.uid() = submitted_by);
 
 -- location votes
 create policy "members can view votes" on public.location_votes for select to authenticated using (true);

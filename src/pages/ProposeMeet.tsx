@@ -51,7 +51,20 @@ export default function ProposeMeet() {
           <input value={form.name} onChange={set('name')} placeholder="e.g. Taco Tuesday" className={inputCls} />
         </Field>
         <Field label="Date">
-          <input type="date" value={form.date} onChange={set('date')} className={inputCls} />
+          <div className="relative">
+            <input
+              type="date"
+              value={form.date}
+              min={new Date().toISOString().slice(0, 10)}
+              onChange={set('date')}
+              onFocus={(e) => {
+                const input = e.currentTarget as HTMLInputElement & { showPicker?: () => void }
+                if (input.showPicker) input.showPicker()
+              }}
+              className={`${inputCls} pl-10`}
+            />
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-lg">📅</span>
+          </div>
         </Field>
         <Field label="Time">
           <div className="mt-1">

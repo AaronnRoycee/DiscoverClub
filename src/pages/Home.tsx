@@ -3,7 +3,7 @@ import { useStore, daysUntil, formatDate, isPast } from '../store'
 import Stars from '../components/Stars'
 
 export default function Home() {
-  const { profile, meets, hasSubmittedLocation, currentUserId } = useStore()
+  const { profile, meets, hasSubmittedLocation, currentUserId, locationOptions, voteForLocation } = useStore()
   const navigate = useNavigate()
 
   const upcoming = meets.filter((m) => !isPast(m.date)).sort((a, b) => a.date.localeCompare(b.date))
@@ -50,6 +50,47 @@ export default function Home() {
             </div>
           ))}
         </div>
+
+        {locationOptions.length > 0 && (
+          <div className="mt-4 space-y-2 border-t border-club-border pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase text-gray-400">Open location votes</p>
+              <button onClick={() => navigate('/vote')} className="text-xs font-semibold text-club-green hover:underline">
+                See all ›
+              </button>
+            </div>
+            {locationOptions.map((o) => {
+              const voted = o.votes.includes(currentUserId)
+              return (
+                <div
+                  key={o.id}
+                  className="flex items-center justify-between gap-3 rounded-xl bg-club-card2 p-3"
+                >
+                  <button onClick={() => navigate('/vote')} className="min-w-0 flex-1 text-left">
+                    <p className="truncate font-semibold">{o.name}</p>
+                    <p className="truncate text-xs text-gray-400">{o.address}{o.city ? `, ${o.city}` : ''}</p>
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-club-green">{o.votes.length}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        voteForLocation(o.id)
+                      }}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
+                        voted
+                          ? 'bg-club-green text-club-bg'
+                          : 'border border-club-border text-club-green hover:bg-club-card'
+                      }`}
+                    >
+                      {voted ? '✔ Voted' : 'Vote'}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </section>
 
       {lastMeet && (
