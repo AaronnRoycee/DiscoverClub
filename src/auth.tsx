@@ -18,10 +18,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!supabase) return
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setLoading(false)
-    })
+    supabase.auth
+      .getSession()
+      .then(({ data, error }) => {
+        if (error) console.error('[auth] getSession:', error.message)
+        setSession(data?.session ?? null)
+      })
+      .catch((e) => console.error('[auth] getSession failed:', e))
+      .finally(() => setLoading(false))
     const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s)
     })
