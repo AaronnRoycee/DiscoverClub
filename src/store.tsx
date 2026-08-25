@@ -530,7 +530,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       supabase.from('notifications').update({ read: true }).eq('user_id', currentUserId).then(logError('mark read'))
   }
 
-  const hasSubmittedProposal = proposals.some((p) => p.proposedBy === currentUserId)
+  const hasSubmittedProposal = proposals.some((p) => p.proposedBy === currentUserId && !p.approvedMeetId)
 
   const editProposal = (id: string, p: Omit<MeetProposal, 'id' | 'proposedBy' | 'supporters' | 'approvedMeetId'>) => {
     setProposals((ps) => ps.map((x) => (x.id === id ? { ...x, ...p } : x)))

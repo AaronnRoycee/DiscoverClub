@@ -72,7 +72,7 @@ function CreateOrJoinGroup() {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    const inviteCode = searchParams.get('invite')
+    const inviteCode = searchParams.get('code')
     if (inviteCode) {
       setCode(inviteCode)
       setMode('join')

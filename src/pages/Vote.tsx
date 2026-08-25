@@ -10,7 +10,7 @@ export default function Vote() {
   const myRole = members.find((m) => m.id === currentUserId)?.role
   const canManage = myRole === 'Organizer' || myRole === 'Admin'
 
-  const sorted = [...proposals].sort((a, b) => b.supporters.length - a.supporters.length)
+  const sorted = proposals.filter((p) => !p.approvedMeetId).sort((a, b) => b.supporters.length - a.supporters.length)
 
   return (
     <div className="space-y-5">
@@ -41,7 +41,7 @@ export default function Vote() {
                   <p className="text-sm text-gray-300">📅 {formatDate(p.date)} · 🕖 {p.time}</p>
                   <p className="text-sm text-gray-300">📍 {p.locationName}</p>
                   {p.address && (
-                    <p className="text-sm text-gray-400">{p.address}{p.city && `, ${p.city}`}{p.state && `, ${p.state}`} {p.zip}</p>
+                    <p className="text-sm text-gray-400">{p.address}{p.city && `, ${p.city}`}{p.state && `, ${p.state}`}{p.zip && ` ${p.zip}`}</p>
                   )}
                   <p className="mt-1 text-xs text-gray-500">Proposed by {memberName(p.proposedBy)}</p>
                 </div>

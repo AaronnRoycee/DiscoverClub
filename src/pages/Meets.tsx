@@ -122,7 +122,7 @@ export default function Meets() {
                     <p className="text-sm text-gray-300">📅 {formatDate(p.date)} · 🕖 {p.time}</p>
                     <p className="text-sm text-gray-300">📍 {p.locationName}</p>
                     {p.address && (
-                      <p className="text-sm text-gray-400">{p.address}{p.city && `, ${p.city}`}{p.state && `, ${p.state}`} {p.zip}</p>
+                      <p className="text-sm text-gray-400">{p.address}{p.city && `, ${p.city}`}{p.state && `, ${p.state}`}{p.zip && ` ${p.zip}`}</p>
                     )}
                     <p className="mt-1 text-xs text-gray-500">Proposed by {memberName(p.proposedBy)} · {p.supporters.length}/{approvalThreshold} supporters</p>
                   </div>

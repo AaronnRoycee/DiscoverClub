@@ -16,9 +16,8 @@ export default function Auth() {
 
   const isValid =
     email.includes('@') &&
-    password.length >= 6 &&
-    (mode !== 'signup' || (name.trim() && password === confirm)) &&
-    (mode !== 'forgot' || true)
+    (mode === 'forgot' || password.length >= 6) &&
+    (mode !== 'signup' || (name.trim() && password === confirm && password.length >= 6))
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
