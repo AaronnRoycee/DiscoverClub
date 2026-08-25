@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useStore, formatDate, isPast } from '../store'
+import { useStore, formatDate, isPast, mapUrlFor } from '../store'
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
 const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 
 export default function Meets() {
-  const { meets } = useStore()
+  const { meets, proposals, supportProposal, deleteProposal, members, profile, currentUserId, approvalThreshold } = useStore()
   const today = new Date()
   const [year, setYear] = useState(today.getFullYear())
   const [month, setMonth] = useState(today.getMonth())
+
+  const myRole = members.find((m) => m.id === currentUserId)?.role
+  const canManage = myRole === 'Organizer' || myRole === 'Admin'
 
   const meetsByDate = new Map(meets.map((m) => [m.date, m]))
   const firstDow = new Date(year, month, 1).getDay()
@@ -33,12 +36,16 @@ export default function Meets() {
     .filter((m) => m.date.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`))
     .sort((a, b) => a.date.localeCompare(b.date))
   const upcoming = meets.filter((m) => !isPast(m.date)).sort((a, b) => a.date.localeCompare(b.date))
+  const openProposals = proposals.filter((p) => !p.approvedMeetId).sort((a, b) => b.supporters.length - a.supporters.length)
+
+  const memberName = (id: string) =>
+    id === currentUserId ? profile.name : (members.find((m) => m.id === id)?.name ?? 'a member')
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold">Meets</h1>
-        <p className="mt-1 text-gray-400">Scheduled meets calendar</p>
+        <p className="mt-1 text-gray-400">Scheduled meets and open proposals</p>
       </div>
 
       <section className="rounded-2xl border border-club-border bg-club-card p-4">
@@ -101,6 +108,69 @@ export default function Meets() {
         </section>
       )}
 
+      {openProposals.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-xs font-bold tracking-widest text-club-green uppercase">Proposed Meets</h2>
+          {openProposals.map((p) => {
+            const iSupport = p.supporters.includes(currentUserId)
+            const isSubmitter = p.proposedBy === currentUserId
+            return (
+              <div key={p.id} className="rounded-2xl border border-club-border bg-club-card p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">{p.name}</p>
+                    <p className="text-sm text-gray-300">📅 {formatDate(p.date)} · 🕖 {p.time}</p>
+                    <p className="text-sm text-gray-300">📍 {p.locationName}</p>
+                    {p.address && (
+                      <p className="text-sm text-gray-400">{p.address}{p.city && `, ${p.city}`}{p.state && `, ${p.state}`} {p.zip}</p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500">Proposed by {memberName(p.proposedBy)} · {p.supporters.length}/{approvalThreshold} supporters</p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <Link to="/vote" className="text-xs font-semibold text-club-green hover:underline">
+                      View ›
+                    </Link>
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-club-bg">
+                    <div className="h-full rounded-full bg-club-green" style={{ width: `${Math.min(100, (p.supporters.length / approvalThreshold) * 100)}%` }} />
+                  </div>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => supportProposal(p.id)}
+                    className={`flex-1 cursor-pointer rounded-xl py-2 text-sm font-semibold ${
+                      iSupport ? 'bg-club-green text-club-bg' : 'border border-club-border text-club-green hover:bg-club-card2'
+                    }`}
+                  >
+                    {iSupport ? '✔ Supported' : '👍 Support'}
+                  </button>
+                  {p.address && (
+                    <a
+                      href={mapUrlFor(p.locationName, p.address, p.city, p.state, p.zip)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-xl border border-club-border px-4 py-2 text-sm font-semibold text-club-green hover:bg-club-card2"
+                    >
+                      🗺️ Map
+                    </a>
+                  )}
+                  {(isSubmitter || canManage) && (
+                    <button
+                      onClick={() => deleteProposal(p.id)}
+                      className="rounded-xl border border-red-400/30 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-400/10"
+                    >
+                      🗑️ Delete
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </section>
+      )}
+
       <section className="space-y-3">
         <h2 className="text-xs font-bold tracking-widest text-club-green uppercase">All Upcoming</h2>
         {upcoming.length === 0 && <p className="text-sm text-gray-400">No upcoming meets scheduled.</p>}
@@ -110,7 +180,7 @@ export default function Meets() {
       </section>
 
       <Link to="/propose" className="block rounded-2xl border border-club-border bg-club-card p-4 text-center font-semibold text-club-green hover:bg-club-card2">
-        💡 Propose the next meet date
+        💡 Propose the next meet
       </Link>
     </div>
   )

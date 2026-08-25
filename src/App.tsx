@@ -9,10 +9,56 @@ import Meets from './pages/Meets'
 import MeetDetail from './pages/MeetDetail'
 import History from './pages/History'
 import Profile from './pages/Profile'
-import Submit from './pages/Submit'
 import Vote from './pages/Vote'
 import ProposeMeet from './pages/ProposeMeet'
 import Auth from './pages/Auth'
+
+function ResetPassword() {
+  const { updatePassword, signOut, authEvent } = useAuth()
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    if (password.length < 6 || password !== confirm) return
+    const err = await updatePassword(password)
+    if (err) setError(err)
+    else setSaved(true)
+  }
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-club-bg px-4 text-gray-100">
+      <div className="w-full max-w-sm rounded-2xl border border-club-border bg-club-card p-5">
+        <h1 className="text-center text-2xl font-bold">Set a new password</h1>
+        <p className="mt-1 text-center text-sm text-gray-400">Password recovery event: {authEvent}</p>
+        <form onSubmit={submit} className="mt-4 space-y-4">
+          <div>
+            <label className="text-xs font-semibold text-gray-400 uppercase">New password</label>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} minLength={6} required className={inputCls} />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-400 uppercase">Confirm password</label>
+            <input type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} minLength={6} required className={inputCls} />
+          </div>
+          {error && <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-400">{error}</p>}
+          {saved && <p className="rounded-lg bg-club-green/10 px-3 py-2 text-sm text-club-green">Password updated. You can now use the app.</p>}
+          <button type="submit" disabled={password !== confirm || password.length < 6} className="w-full cursor-pointer rounded-xl bg-club-green py-2.5 font-semibold text-club-bg hover:brightness-110 disabled:opacity-40">
+            Update password
+          </button>
+        </form>
+        <button onClick={() => signOut()} className="mt-4 w-full rounded-xl border border-club-border py-2 text-sm font-semibold text-gray-300 hover:bg-club-card2">
+          Sign out instead
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const inputCls =
+  'mt-1 w-full rounded-xl border border-club-border bg-club-bg px-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:border-club-green focus:outline-none'
 
 function CreateOrJoinGroup() {
   const { profile, createClub, joinClub } = useStore()
@@ -26,7 +72,7 @@ function CreateOrJoinGroup() {
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
-    const inviteCode = searchParams.get('code')
+    const inviteCode = searchParams.get('invite')
     if (inviteCode) {
       setCode(inviteCode)
       setMode('join')
@@ -177,7 +223,7 @@ function MembershipGate({ children }: { children: ReactNode }) {
 }
 
 function Root() {
-  const { session, loading, isConfigured } = useAuth()
+  const { session, loading, isConfigured, authEvent } = useAuth()
 
   if (isConfigured && loading) {
     return (
@@ -188,6 +234,10 @@ function Root() {
   }
 
   if (isConfigured && !session) return <Auth />
+
+  if (isConfigured && session && authEvent === 'PASSWORD_RECOVERY') {
+    return <ResetPassword />
+  }
 
   return (
     <StoreProvider key={session?.user.id ?? 'demo'}>
@@ -200,7 +250,6 @@ function Root() {
           <Route path="/meets/:id" element={<MeetDetail />} />
           <Route path="/history" element={<History />} />
           <Route path="/profile" element={<Profile />} />
-          <Route path="/submit" element={<Submit />} />
           <Route path="/vote" element={<Vote />} />
           <Route path="/propose" element={<ProposeMeet />} />
         </Route>

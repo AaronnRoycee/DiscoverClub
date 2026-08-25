@@ -74,9 +74,8 @@ const navItems = [
 ]
 
 const quickActions = [
-  { to: '/submit', icon: '📍', title: 'Submit a Location', desc: 'Suggest a spot for the ballot' },
-  { to: '/propose', icon: '💡', title: 'Propose a Meet', desc: 'Suggest the next meet date' },
-  { to: '/vote', icon: '🗳️', title: 'Vote for Locations', desc: 'Pick your favorite spot' },
+  { to: '/propose', icon: '💡', title: 'Propose a Meet', desc: 'Suggest location, date, and time' },
+  { to: '/vote', icon: '🗳️', title: 'Vote for Meets', desc: 'Support your favorite proposal' },
 ]
 
 function QuickActionsButton() {

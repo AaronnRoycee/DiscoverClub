@@ -6,8 +6,9 @@ import TimePicker from '../components/TimePicker'
 const emptyForm = { name: '', date: '', time: '7:00 PM', locationName: '', address: '', city: '', state: 'TX', zip: '' }
 
 export default function ProposeMeet() {
-  const { proposals, addProposal, supportProposal, members, profile, currentUserId, approvalThreshold } = useStore()
+  const { proposals, addProposal, editProposal, deleteProposal, supportProposal, members, profile, currentUserId, approvalThreshold } = useStore()
   const [form, setForm] = useState(emptyForm)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
 
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -18,35 +19,52 @@ export default function ProposeMeet() {
   const memberName = (id: string) =>
     id === currentUserId ? profile.name : (members.find((m) => m.id === id)?.name ?? 'a member')
 
+  const myRole = members.find((m) => m.id === currentUserId)?.role
+  const canManage = myRole === 'Organizer' || myRole === 'Admin'
+
   const sorted = [...proposals].sort((a, b) => b.supporters.length - a.supporters.length)
+
+  const startEdit = (p: (typeof proposals)[number]) => {
+    setForm({
+      name: p.name,
+      date: p.date,
+      time: p.time,
+      locationName: p.locationName,
+      address: p.address,
+      city: p.city,
+      state: p.state,
+      zip: p.zip,
+    })
+    setEditingId(p.id)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const cancelEdit = () => {
+    setForm(emptyForm)
+    setEditingId(null)
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!valid) return
+    if (editingId) {
+      editProposal(editingId, { ...form })
+      setEditingId(null)
+    } else {
+      addProposal({ ...form })
+      setSubmitted(true)
+    }
+    setForm(emptyForm)
+  }
 
   return (
     <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold">Propose a Meet</h1>
-        <p className="mt-1 text-gray-400">Anyone can suggest the next meet date — not just the organizer</p>
+        <p className="mt-1 text-gray-400">Suggest a location, date, and time for the group. Members vote to make it official.</p>
       </div>
 
-      <form
-        className="space-y-4 rounded-2xl border border-club-border bg-club-card p-4"
-        onSubmit={(e) => {
-          e.preventDefault()
-          if (valid) {
-            addProposal({
-              name: form.name.trim(),
-              date: form.date,
-              time: form.time.trim(),
-              locationName: form.locationName.trim(),
-              address: form.address.trim(),
-              city: form.city.trim(),
-              state: form.state.trim(),
-              zip: form.zip.trim(),
-            })
-            setForm(emptyForm)
-            setSubmitted(true)
-          }
-        }}
-      >
+      <form className="space-y-4 rounded-2xl border border-club-border bg-club-card p-4" onSubmit={handleSubmit}>
         <Field label="Meet Name">
           <input value={form.name} onChange={set('name')} placeholder="e.g. Taco Tuesday" className={inputCls} />
         </Field>
@@ -88,23 +106,31 @@ export default function ProposeMeet() {
             <input value={form.zip} onChange={set('zip')} placeholder="75206" inputMode="numeric" maxLength={10} className={inputCls} />
           </Field>
         </div>
-        <button
-          type="submit"
-          disabled={!valid}
-          className="w-full cursor-pointer rounded-xl bg-club-green py-2.5 font-semibold text-club-bg disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          Propose Meet
-        </button>
-        {submitted && <p className="text-center text-sm text-club-green">✔ Proposal added! The group can now support it below.</p>}
+        <div className="flex gap-2">
+          <button
+            type="submit"
+            disabled={!valid}
+            className="flex-1 cursor-pointer rounded-xl bg-club-green py-2.5 font-semibold text-club-bg hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {editingId ? 'Save changes' : 'Propose Meet'}
+          </button>
+          {editingId && (
+            <button type="button" onClick={cancelEdit} className="rounded-xl border border-club-border px-4 py-2 text-sm font-semibold text-gray-300 hover:bg-club-card2">
+              Cancel
+            </button>
+          )}
+        </div>
+        {submitted && !editingId && <p className="text-center text-sm text-club-green">✔ Proposal added! The group can now support it below.</p>}
       </form>
 
       <section className="space-y-3">
         <h2 className="text-xs font-bold tracking-widest text-club-green uppercase">📋 Proposed Meets</h2>
-        <p className="text-xs text-gray-500">A proposal becomes an official meet on the calendar once {approvalThreshold} members support it.</p>
+        <p className="text-xs text-gray-500">A proposal becomes an official meet once {approvalThreshold} members support it.</p>
         {sorted.length === 0 && <p className="text-sm text-gray-400">No proposals yet. Be the first!</p>}
         {sorted.map((p) => {
           const iSupport = p.supporters.includes(currentUserId)
           const approved = Boolean(p.approvedMeetId)
+          const isSubmitter = p.proposedBy === currentUserId
           return (
             <div key={p.id} className={`rounded-2xl border p-4 ${approved || iSupport ? 'border-club-green bg-club-green-dark' : 'border-club-border bg-club-card'}`}>
               <div className="flex items-start justify-between gap-3">
@@ -135,7 +161,7 @@ export default function ProposeMeet() {
                   ✔ Approved — view it on the calendar ›
                 </Link>
               )}
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 {!approved && (
                   <button
                     onClick={() => supportProposal(p.id)}
@@ -155,6 +181,19 @@ export default function ProposeMeet() {
                   >
                     🗺️ Map
                   </a>
+                )}
+                {!approved && isSubmitter && (
+                  <button onClick={() => startEdit(p)} className="rounded-xl border border-club-border px-4 py-2 text-sm font-semibold text-gray-300 hover:bg-club-card2">
+                    ✏️ Edit
+                  </button>
+                )}
+                {!approved && (isSubmitter || canManage) && (
+                  <button
+                    onClick={() => deleteProposal(p.id)}
+                    className="rounded-xl border border-red-400/30 px-4 py-2 text-sm font-semibold text-red-400 hover:bg-red-400/10"
+                  >
+                    🗑️ Delete
+                  </button>
                 )}
               </div>
             </div>

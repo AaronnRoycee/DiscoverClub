@@ -53,17 +53,6 @@ export interface Notification {
   read: boolean
 }
 
-export interface LocationOption {
-  id: string
-  name: string
-  address: string
-  city: string
-  state: string
-  zip: string
-  submittedBy: string
-  votes: string[]
-}
-
 export interface MeetProposal {
   id: string
   name: string
@@ -225,12 +214,6 @@ export const initialNotifications: Notification[] = [
   { id: 'n3', text: 'Friday Food Club is in 3 days — RSVP now', time: '2d ago', link: '/meets/m1', read: true },
 ]
 
-export const initialLocationOptions: LocationOption[] = [
-  { id: 'l1', name: 'Pecan Lodge', address: '2702 Main St', city: 'Dallas', state: 'TX', zip: '75226', submittedBy: 'u2', votes: ['u2', 'u3'] },
-  { id: 'l2', name: 'Velvet Taco', address: '3012 N Henderson Ave', city: 'Dallas', state: 'TX', zip: '75206', submittedBy: 'u5', votes: ['u5'] },
-  { id: 'l3', name: 'Meddlesome Moth', address: '1621 Oak Lawn Ave', city: 'Dallas', state: 'TX', zip: '75207', submittedBy: 'u7', votes: ['u7', 'u4', 'u6'] },
-]
-
 export const initialProposals: MeetProposal[] = [
   {
     id: 'p1',
@@ -293,18 +276,16 @@ interface Store {
   meets: Meet[]
   notifications: Notification[]
   markNotificationsRead: () => void
-  locationOptions: LocationOption[]
-  submitLocation: (loc: Omit<LocationOption, 'id' | 'submittedBy' | 'votes'>) => void
-  editLocation: (id: string, loc: Omit<LocationOption, 'id' | 'submittedBy' | 'votes'>) => void
-  hasSubmittedLocation: boolean
-  voteForLocation: (id: string) => void
+  hasSubmittedProposal: boolean
+  proposals: MeetProposal[]
+  addProposal: (p: Omit<MeetProposal, 'id' | 'proposedBy' | 'supporters'>) => void
+  editProposal: (id: string, p: Omit<MeetProposal, 'id' | 'proposedBy' | 'supporters' | 'approvedMeetId'>) => void
+  deleteProposal: (id: string) => void
+  supportProposal: (id: string) => void
   setRsvp: (meetId: string, rsvp: Rsvp) => void
   addReview: (meetId: string, rating: number, comment: string) => void
   addChatMessage: (meetId: string, text: string) => void
   addPhoto: (meetId: string, dataUrl: string) => void
-  proposals: MeetProposal[]
-  addProposal: (p: Omit<MeetProposal, 'id' | 'proposedBy' | 'supporters'>) => void
-  supportProposal: (id: string) => void
   approvalThreshold: number
   isLive: boolean
   membershipStatus: 'loading' | 'noclub' | 'pending' | 'approved'
@@ -347,7 +328,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [club, setClub] = useState<Club | null>(isLive ? null : { id: 'demo', name: 'DiscoverClub', code: 'DEMO42' })
   const [meets, setMeets] = useState<Meet[]>(isLive ? [] : initialMeets)
   const [notifications, setNotifications] = useState<Notification[]>(isLive ? [] : initialNotifications)
-  const [locationOptions, setLocationOptions] = useState<LocationOption[]>(isLive ? [] : initialLocationOptions)
   const [proposals, setProposals] = useState<MeetProposal[]>(isLive ? [] : initialProposals)
 
   const approvalThreshold = isLive ? Math.max(2, Math.floor(members.length / 2) + 1) : 5
@@ -355,7 +335,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const loadAll = useCallback(async () => {
     if (!supabase || !session) return
     const uid = session.user.id
-    const [profilesRes, clubRes, meetsRes, rsvpsRes, reviewsRes, chatRes, photosRes, optionsRes, votesRes, proposalsRes, supportersRes, notifsRes] =
+    const [profilesRes, clubRes, meetsRes, rsvpsRes, reviewsRes, chatRes, photosRes, proposalsRes, supportersRes, notifsRes] =
       await Promise.all([
         supabase.from('profiles').select('*').order('joined_at'),
         supabase.from('clubs').select('*').maybeSingle(),
@@ -364,8 +344,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         supabase.from('reviews').select('*').order('created_at'),
         supabase.from('chat_messages').select('*').order('created_at'),
         supabase.from('meet_photos').select('*').order('created_at'),
-        supabase.from('location_options').select('*').order('created_at'),
-        supabase.from('location_votes').select('*'),
         supabase.from('proposals').select('*').order('created_at'),
         supabase.from('proposal_supporters').select('*'),
         supabase.from('notifications').select('*').eq('user_id', uid).order('created_at', { ascending: false }),
@@ -423,20 +401,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         chat: chat
           .filter((c) => c.meet_id === m.id)
           .map((c) => ({ id: c.id, memberId: c.user_id, text: c.text, time: fmtChatTime(c.created_at) })),
-      })),
-    )
-
-    const votes = votesRes.data ?? []
-    setLocationOptions(
-      (optionsRes.data ?? []).map((o) => ({
-        id: o.id,
-        name: o.name,
-        address: o.address ?? '',
-        city: o.city ?? '',
-        state: o.state ?? '',
-        zip: o.zip ?? '',
-        submittedBy: o.submitted_by,
-        votes: votes.filter((v) => v.option_id === o.id).map((v) => v.user_id),
       })),
     )
 
@@ -566,50 +530,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       supabase.from('notifications').update({ read: true }).eq('user_id', currentUserId).then(logError('mark read'))
   }
 
-  const hasSubmittedLocation = locationOptions.some((o) => o.submittedBy === currentUserId)
+  const hasSubmittedProposal = proposals.some((p) => p.proposedBy === currentUserId)
 
-  const submitLocation = (loc: Omit<LocationOption, 'id' | 'submittedBy' | 'votes'>) => {
-    const id = crypto.randomUUID()
-    setLocationOptions((opts) => [...opts, { ...loc, id, submittedBy: currentUserId, votes: [currentUserId] }])
-    if (isLive && supabase) {
-      supabase
-        .from('location_options')
-        .insert({ id, name: loc.name, address: loc.address, city: loc.city, state: loc.state, zip: loc.zip, submitted_by: currentUserId })
-        .then((res) => {
-          logError('submit location')(res)
-          if (!res.error) supabase!.from('location_votes').insert({ option_id: id, user_id: currentUserId }).then(logError('self vote'))
-        })
-      notifyOthers(`${profile.name} suggested ${loc.name} — vote now!`, '/vote')
-    }
-  }
-
-  const editLocation = (id: string, loc: Omit<LocationOption, 'id' | 'submittedBy' | 'votes'>) => {
-    setLocationOptions((opts) => opts.map((o) => (o.id === id ? { ...o, ...loc } : o)))
+  const editProposal = (id: string, p: Omit<MeetProposal, 'id' | 'proposedBy' | 'supporters' | 'approvedMeetId'>) => {
+    setProposals((ps) => ps.map((x) => (x.id === id ? { ...x, ...p } : x)))
     if (isLive && supabase)
-      supabase.from('location_options').update({ name: loc.name, address: loc.address, city: loc.city, state: loc.state, zip: loc.zip }).eq('id', id).then(logError('edit location'))
+      supabase
+        .from('proposals')
+        .update({ name: p.name, date: p.date, time: p.time, location_name: p.locationName, address: p.address, city: p.city, state: p.state, zip: p.zip })
+        .eq('id', id)
+        .then(logError('edit proposal'))
   }
 
-  const voteForLocation = (id: string) => {
-    const previous = locationOptions.find((o) => o.votes.includes(currentUserId))
-    const target = locationOptions.find((o) => o.id === id)
-    if (!target) return
-    const isRemoving = previous?.id === id
-    setLocationOptions((opts) =>
-      opts.map((o) => {
-        const votes = o.votes.filter((v) => v !== currentUserId)
-        if (o.id === id && !isRemoving) votes.push(currentUserId)
-        return { ...o, votes }
-      }),
-    )
-    if (isLive && supabase) {
-      const run = async () => {
-        if (previous)
-          await supabase!.from('location_votes').delete().eq('option_id', previous.id).eq('user_id', currentUserId)
-        if (!isRemoving)
-          await supabase!.from('location_votes').insert({ option_id: id, user_id: currentUserId })
-      }
-      run().catch((e) => console.error('[supabase] vote:', e))
-    }
+  const deleteProposal = (id: string) => {
+    setProposals((ps) => ps.filter((x) => x.id !== id))
+    if (isLive && supabase) supabase.from('proposals').delete().eq('id', id).then(logError('delete proposal'))
   }
 
   const setRsvp = (meetId: string, rsvp: Rsvp) => {
@@ -756,18 +691,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         meets,
         notifications,
         markNotificationsRead,
-        locationOptions,
-        submitLocation,
-        editLocation,
-        hasSubmittedLocation,
-        voteForLocation,
+        hasSubmittedProposal,
+        proposals,
+        addProposal,
+        editProposal,
+        deleteProposal,
+        supportProposal,
         setRsvp,
         addReview,
         addChatMessage,
         addPhoto,
-        proposals,
-        addProposal,
-        supportProposal,
         approvalThreshold,
         isLive,
         membershipStatus,

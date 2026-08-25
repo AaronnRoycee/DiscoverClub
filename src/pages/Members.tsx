@@ -36,12 +36,12 @@ export default function Members() {
           <div className="mt-3 flex items-center gap-3">
             <input
               readOnly
-              value={`${window.location.origin}${import.meta.env.BASE_URL}?code=${club.code}`}
+              value={`${window.location.origin}${import.meta.env.BASE_URL}?invite=${club.code}`}
               className="min-w-0 flex-1 truncate rounded-xl border border-club-border bg-club-bg px-3 py-2 text-sm text-gray-400"
             />
             <button
               onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}${import.meta.env.BASE_URL}?code=${club.code}`)
+                navigator.clipboard.writeText(`${window.location.origin}${import.meta.env.BASE_URL}?invite=${club.code}`)
                 setLinkCopied(true)
                 setTimeout(() => setLinkCopied(false), 2000)
               }}
