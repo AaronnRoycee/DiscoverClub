@@ -7,7 +7,7 @@ interface AuthState {
   loading: boolean
   isConfigured: boolean
   authEvent: string | null
-  signUp: (email: string, password: string, name: string) => Promise<string | null>
+  signUp: (email: string, password: string, username: string) => Promise<string | null>
   signIn: (email: string, password: string) => Promise<string | null>
   resetPassword: (email: string) => Promise<string | null>
   updatePassword: (password: string) => Promise<string | null>
@@ -42,12 +42,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => sub.subscription.unsubscribe()
   }, [])
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const signUp = async (email: string, password: string, username: string) => {
     if (!supabase) return 'Backend not configured'
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { name }, emailRedirectTo: redirectTo() },
+      options: { data: { username, name: username }, emailRedirectTo: redirectTo() },
     })
     return error ? error.message : null
   }

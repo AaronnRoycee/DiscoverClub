@@ -9,7 +9,7 @@ export default function Auth() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
-  const [name, setName] = useState('')
+  const [username, setUsername] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -17,7 +17,7 @@ export default function Auth() {
   const isValid =
     email.includes('@') &&
     (mode === 'forgot' || password.length >= 6) &&
-    (mode !== 'signup' || (name.trim() && password === confirm && password.length >= 6))
+    (mode !== 'signup' || (username.trim() && password === confirm && password.length >= 6))
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,7 +27,7 @@ export default function Auth() {
     setBusy(true)
     let err: string | null = null
     if (mode === 'signin') err = await signIn(email, password)
-    if (mode === 'signup') err = await signUp(email, password, name.trim())
+    if (mode === 'signup') err = await signUp(email, password, username.trim())
     if (mode === 'forgot') err = await resetPassword(email)
     setBusy(false)
     if (err) {
@@ -59,11 +59,11 @@ export default function Auth() {
         <form onSubmit={submit} className="mt-6 space-y-4 rounded-2xl border border-club-border bg-club-card p-5">
           {mode === 'signup' && (
             <div>
-              <label className="text-xs font-semibold text-gray-400 uppercase">Your name</label>
+              <label className="text-xs font-semibold text-gray-400 uppercase">Username</label>
               <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Royce"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Choose a username"
                 required
                 className={inputCls}
               />
