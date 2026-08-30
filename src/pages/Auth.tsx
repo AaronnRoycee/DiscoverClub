@@ -35,12 +35,12 @@ export default function Auth() {
       return
     }
     if (mode === 'signup') {
-      setMessage('Check your email to confirm your account, then sign in.')
+      setMessage('Check your email to confirm your account, then sign in. If you do not see it, check spam/promotions.')
       setMode('signin')
       setPassword('')
       setConfirm('')
     } else if (mode === 'forgot') {
-      setMessage('If that email exists, a reset link has been sent.')
+      setMessage('If that email exists, a reset link has been sent. Check spam/promotions if it is not in your inbox.')
     }
   }
 
