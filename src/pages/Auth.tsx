@@ -35,8 +35,7 @@ export default function Auth() {
       return
     }
     if (mode === 'signup') {
-      setMessage('Check your email to confirm your account, then sign in. If you do not see it, check spam/promotions.')
-      setMode('signin')
+      setMessage('Account created — signing you in…')
       setPassword('')
       setConfirm('')
     } else if (mode === 'forgot') {
